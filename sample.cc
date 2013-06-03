@@ -4,7 +4,6 @@
 
 #include "sand.hpp"
 
-
 int main()
 {
     using namespace sand;
@@ -12,144 +11,126 @@ int main()
     double then = now();
     std::cout << to_nanoseconds(now() - then) << std::endl;
 
-    std::cout << ago( seconds(0) ) << ',';
-    std::cout << ago( seconds(1) ) << ',';
-    std::cout << ago( seconds(60) ) << ',';
-    std::cout << ago( seconds(61) ) << ',';
-    std::cout << ago( minutes(1) ) << ',';
-    std::cout << ago( minutes(30) ) << ',';
-    std::cout << ago( minutes(60) ) << ',';
-    std::cout << ago( hours(5) ) << ',';
-    std::cout << ago( hours(12) ) << ',';
-    std::cout << ago( hours(24) ) << ',';
-    std::cout << ago( hours(25) ) << ',';
-    std::cout << ago( days(1) ) << ',';
-    std::cout << ago( days(12) ) << ',';
-    std::cout << ago( days(5) ) << ',';
-    std::cout << ago( days(7) ) << ',';
-    std::cout << ago( days(13) ) << ',';
-    std::cout << ago( days(14) ) << ',';
-    std::cout << ago( days(32) ) << ',';
-    std::cout << ago( weeks(5) ) << ',';
-
-    for( int i = 0; i <= 32; ++i ) std::cout << ago( days(i) ) << ',';
-    for( int i = 0; i <= 53; ++i ) std::cout << ago( weeks(i) ) << ',';
-
-    std::cout << std::endl;
-
     std::cout << runtime() << std::endl;
 
-    std::cout << format( now(), "us-EN" ) << std::endl;
-    std::cout << format( now(), "es-ES" ) << std::endl;
-    std::cout << format( now() + years(10), "es-ES" ) << std::endl;
-    std::cout << format( now() - years(10), "es-ES" ) << std::endl;
+    std::cout << locale( now(), "us-EN" ) << std::endl;
+    std::cout << locale( now(), "es-ES" ) << std::endl;
+    std::cout << locale( now() + years(10), "es-ES" ) << std::endl;
+    std::cout << locale( now() - years(10), "es-ES" ) << std::endl;
+
+    std::cout << format( now(), "%Y-%m-%d %H:%M:%S" ) << std::endl;
+    std::cout << format( now() + years(10), "%Y-%m-%d %H:%M:%S" ) << std::endl;
+
+    assert( ago( seconds( 0) ) == "just now" );
+    assert( ago( seconds( 1) ) == "just now" );
+    assert( ago( seconds(60) ) == "a minute ago" );
+    assert( ago( seconds(61) ) == "a minute ago" );
+    assert( ago( minutes( 1) ) == "a minute ago" );
+    assert( ago( minutes(60) ) == "an hour ago" );
+    assert( ago( minutes(61) ) == "an hour ago" );
+    assert( ago(   hours( 1) ) == "an hour ago" );
+    assert( ago(   hours(24) ) == "yesterday" );
+    assert( ago(   hours(25) ) == "yesterday" );
+    assert( ago(   days( 1) ) == "yesterday" );
+    assert( ago(   days( 5) ) == "5 days ago" );
+    assert( ago(   days( 7) ) == "7 days ago" );
+    assert( ago(   days(12) ) == "12 days ago" );
+    assert( ago(   days(13) ) == "13 days ago" );
+    assert( ago(   days(14) ) == "2 weeks ago" );
+    assert( ago(   days(32) ) == "a month ago" );
+    assert( ago(  weeks(52) ) == "11 months ago" );
+    assert( ago(  weeks(53) ) == "a year ago" );
+
+    assert( pretty( days(-1) ) == "yesterday" );
+    assert( pretty( days(+1) ) == "tomorrow" );
+
+    assert( dt().ns() > 0 );
+
+    std::cout << ago( now() - calendar("1970-01-01 00:00:00") ) << std::endl;
 
     {
-        sand::rtc
-            past( "1972-06-10 17:00:00" ),
-            present,
-            future( "2091-12-31 23:59:50" );
+        auto
+            past = calendar( "1972-06-10 17:00:00" ),
+            present = now(),
+            future = calendar( "2091-12-31 23:59:55" );
 
-        // we want future to lapse at double speed
-        future.shift( 2.0 );
+        assert( str(past) == "1972-06-10 17:00:00" );
+      //assert( str(present) == "your current time and date" );
+        assert( str(future) == "2091-12-31 23:59:55" );
 
-        // eleven seconds
-        for( int i = 0; i <= 10; ++i )
-        {
-               past.update();
-            present.update();
-             future.update();
+        past ++;
+        present ++;
+        future += 6.0;
 
-            std::cout
-                << "past: " << past.str() << " | "
-                << "present: " << present.str() << " | "
-                << "future: " << future.str()
-                << std::endl;
-
-            // sleep for one second
-            sand::sleep( 1.0 );
-        }
+        assert( str(past) == "1972-06-10 17:00:01" );
+      //assert( str(present) == "your current time and date plus one second" );
+        assert( str(future) == "2092-01-01 00:00:01" );
     }
 
     {
-        std::cout << "- sand::rtc is a realtime clock class" << std::endl;
-        std::cout << "- treat classes as doubles, measuring in seconds. update by using .update() method" << std::endl;
-        std::cout << "- human readable/serialization by using .str() method" << std::endl;
-        std::cout << "- check header for other methods" << std::endl;
-        std::cout << std::endl;
+        double rtc = now();
+        double then = calendar( "2010-12-31 23:59:59" );
+#if 0
+        double then2 = years(2010) + months(12) + days(31) + hours(23) + minutes(59) + seconds(59);
 
-        sand::rtc rtc;
-        sand::rtc rtc_date( "2010-12-31 23:59:59" );
+        std::cout << years(2010) << std::endl;
+        std::cout << months(12) << std::endl;
+        std::cout << days(31) << std::endl;
+        std::cout << hours(23) << std::endl;
+        std::cout << minutes(59) << std::endl;
+        std::cout << seconds(59) << std::endl;
 
-        std::cout << "* after creation (as double)" << std::endl;
+        std::cout << std::setprecision(20) << then << " vs " << then2 << std::endl;
+        std::cout << str(then) << " vs " << str(then2) << std::endl;
+        assert( str(then) == str(then2) );
+#endif
 
-            std::cout << "- rtc : " << std::setprecision(20) <<  rtc << std::endl;
-            std::cout << "- rtc date : " << std::setprecision(20) << rtc_date << std::endl;
+        assert( year(then) == 2010 );
+        assert( month(then) == 12 );
+        assert( day(then) == 31 );
+        assert( hour(then) == 23 );
+        assert( minute(then) == 59 );
+        assert( second(then) == 59 );
 
-            std::cout << std::endl;
+        std::cout << "[ ] print ";
+            std::cout << "- rtc : " << std::setprecision(20) << rtc << " -> " << str(rtc) << " -> " << pretty(now() - rtc);
+            std::cout << "\r[x]" << std::endl;
 
-        std::cout << "* after creation (as string)" << std::endl;
+        std::cout << "[ ] serialization ";
+            std::cout << "- rtc : " << str(rtc);
+            std::cout << "\r[x]" << std::endl;
 
-            std::cout << "- rtc : " << rtc.str() << std::endl;
-            std::cout << "- rtc date : " << rtc_date.str() << std::endl;
+        std::cout << "[ ] print ";
+            std::cout << "- then : " << std::setprecision(20) << then << " -> " << str(then) << " -> " << pretty(then - now());
+            std::cout << "\r[x]" << std::endl;
 
-            std::cout << std::endl;
+        std::cout << "[ ] serialization ";
+            std::cout << "- then : " << str(then);
+            std::cout << "\r[x]" << std::endl;
 
-        std::cout << "* after freezing app for 1 second" << std::endl;
+        std::cout << "[ ] logical/arithmetical tests";
+            rtc ++;
+            then ++;
+            assert( rtc == rtc );
+            assert( rtc != then );
+            assert( rtc + 1 > rtc );
+            std::cout << "\r[x]" << std::endl;
 
-            sand::sleep(1);
-
-            std::cout << "- rtc : " << rtc.str() << std::endl;
-            std::cout << "- rtc date : " << rtc_date.str() << std::endl;
-
-            std::cout << std::endl;
-
-        std::cout << "* after updating (as double)" << std::endl;
-
-            rtc.update();
-            rtc_date.update();
-
-            std::cout << "- rtc : " << std::setprecision(20) << rtc << std::endl;
-            std::cout << "- rtc date : " << std::setprecision(20) << rtc_date << std::endl;
-
-            std::cout << std::endl;
-
-        std::cout << "* after updating (as string)" << std::endl;
-
-            std::cout << "- rtc : " << rtc.str() << std::endl;
-            std::cout << "- rtc date : " << rtc_date.str() << std::endl;
-
-            std::cout << std::endl;
-
-        std::cout << "* logical/arithmetical tests:" << std::endl;
-
-            std::cout << "test #1 rtc       == rtc   : " << ( rtc       == rtc      ? "ok" : "FAILED" ) << std::endl;
-            std::cout << "test #2 rtc       != timer : " << ( rtc       != rtc_date ? "ok" : "FAILED" ) << std::endl;
-            std::cout << "test #3 timer + 1 >  timer : " << ( rtc + 1   >  rtc      ? "ok" : "FAILED" ) << std::endl;
-
-            std::cout << std::endl;
-
-        std::cout << "* daylight savings tests:" << std::endl;
-
-            sand::rtc winter( "2010-12-31 23:59:59" );
-            sand::rtc autumn( "1991-10-10 17:00:00" );
-
-            std::cout << winter.str() << " vs " << "2010-12-31 23:59:59" << std::endl;
-            std::cout << autumn.str() << " vs " << "1991-10-10 17:00:00" << std::endl;
-
-            assert( winter.str() == "2010-12-31 23:59:59" );
-            assert( autumn.str() == "1991-10-10 17:00:00" );
+        std::cout << "[ ] daylight savings tests";
+            double winter = calendar( "2010-12-31 23:59:59" );
+            double autumn = calendar( "1991-10-10 17:00:00" );
+            assert( str(winter) == "2010-12-31 23:59:59" );
+            assert( str(autumn) == "1991-10-10 17:00:00" );
+            std::cout << "\r[x]" << std::endl;
     }
-
-    std::cout << runtime() << std::endl;
 
     {
         dt dt;
         sleep( seconds(1.5) );
-        std::cout << dt.s() << ',' << dt.ns() << ',' << dt.us() << std::endl;
+        std::cout << dt.s() << ',' << dt.ms() << ',' << dt.us() << ',' << dt.ns() << std::endl;
+        double t = dt.s();
+        std::cout << to_seconds(t) << ',' << to_milliseconds(t) << ',' << to_microseconds(t) << ',' << to_nanoseconds(t) << std::endl;
     }
-
-    assert( dt().ns() > 0 );
 
     return 0;
 }

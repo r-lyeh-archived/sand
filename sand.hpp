@@ -19,6 +19,8 @@ namespace sand
     double runtime();
     // advance all clocks specified time (for QA and testing purposes)
     void lapse( double t );
+    // void pause( bool on = false ) {}
+    // void resume() { pause(false); }
 
     // conversion
     double nanoseconds( double t );
@@ -29,6 +31,7 @@ namespace sand
     double hours( double t );
     double days( double t );
     double weeks( double t );
+    double months( double t );
     double years( double t );
     double to_nanoseconds( double t );
     double to_microseconds( double t );
@@ -38,22 +41,33 @@ namespace sand
     double to_hours( double t );
     double to_days( double t );
     double to_weeks( double t );
+    double to_months( double t );
     double to_years( double t );
 
+    double calendar( const std::string &YMDhms );
+    // double date( const std::string &YMD );
+    // double time( const std::string &hms );
+
+    // extraction
+    int hour( double timestamp );
+    int minute( double timestamp );
+    int second( double timestamp );
+    int day( double timestamp );
+    int month( double timestamp );
+    int year( double timestamp );
+
     // pretty printing
+    std::string pretty( double t );
     std::string ago( double t );
     std::string in( double t );
 
-    // extraction
-    int hour( std::uint64_t timestamp );
-    int minute( std::uint64_t timestamp );
-    int second( std::uint64_t timestamp );
-    int day( std::uint64_t timestamp );
-    int month( std::uint64_t timestamp );
-    int year( std::uint64_t timestamp );
-
     // format
-    std::string format( std::uint64_t timestamp_secs = 0, const std::string &locale = std::string() );
+    std::string format( double timestamp, const std::string &format, const std::string &locale = std::string() );
+    std::string locale( double timestamp, const std::string &locale, const std::string &format = std::string() );
+
+    // serialization
+    std::string str( double timestamp );
+    double str( const std::string &timestamp );
 
     // usage:
     // sand::dt dt;
@@ -86,46 +100,9 @@ namespace sand
         }
     };
 
-    class rtc
-    {
-        sand::dt dt;
-
-        bool held;
-        std::time_t creation;
-        double factor;
-
-        // object time (in seconds.microseconds)
-        time_t time_obj();
-        time_t elapsed();
-
-        public:
-
-        rtc();
-        rtc( const std::string &import );
-
-        void reset();
-        void set( const double &t );
-        void shift( double f );
-        void pause();
-        double resume();
-        double update();
-
-        double get() const;
-        operator double() const;
-
-        std::string format( const std::string &fmt ) const;
-
-        int Y() const;
-        int M() const;
-        int D() const;
-
-        int h() const;
-        int m() const;
-        int s() const;
-
-        std::string str() const;
-        void str( const std::string& import );
-    };
+    //
+    // double tick(__FILE__, __LINE__);
+    // bool wait( double hz = 60.0 );
 
     class fps
     {
@@ -150,6 +127,7 @@ namespace sand
         std::deque< float > history;
     };
 
+    // once(); !!
     // usage:
     // sand::chrono ch(3.5);
     // ch.s() -> [0..1]
@@ -182,6 +160,7 @@ namespace sand
         }
     };
 
+    // every(); !!
     // usage:
     // sand::looper l(3.5); // loop every 3.5seconds
     // l.s() -> [0..1][...]
@@ -338,7 +317,7 @@ namespace sand
 
     // generics ; always fresh, never memoized
     float tween( int type, float dt01 );
-    const char *str( int type );
+    const char *type( int type );
 
     enum TYPE
     {

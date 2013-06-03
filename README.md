@@ -10,103 +10,117 @@ sand
 
 sync api
 --------
-- `wink()`
-- `sleep(time)`
-- `now()`
-- `runtime()`
-- `lapse(time)`
+- `wink()`: @todocument
+- `sleep(time)`: @todocument
+- `now()`: @todocument
+- `runtime()`: @todocument
+- `lapse(time)`: @todocument
 
 conversion api
 --------------
-- `nanoseconds(time)`
-- `microseconds(time)`
-- `milliseconds(time)`
-- `seconds(time)`
-- `minutes(time)`
-- `hours(time)`
-- `days(time)`
-- `weeks(time)`
-- `years(time)`
-- `to_nanoseconds(time)`
-- `to_microseconds(time)`
-- `to_milliseconds(time)`
-- `to_seconds(time)`
-- `to_minutes(time)`
-- `to_hours(time)`
-- `to_days(time)`
-- `to_weeks(time)`
-- `to_years(time)`
+- `nanoseconds(time)`: @todocument
+- `microseconds(time)`: @todocument
+- `milliseconds(time)`: @todocument
+- `seconds(time)`: @todocument
+- `minutes(time)`: @todocument
+- `hours(time)`: @todocument
+- `days(time)`: @todocument
+- `weeks(time)`: @todocument
+- `years(time)`: @todocument
+
+- `to_nanoseconds(time)`: @todocument
+- `to_microseconds(time)`: @todocument
+- `to_milliseconds(time)`: @todocument
+- `to_seconds(time)`: @todocument
+- `to_minutes(time)`: @todocument
+- `to_hours(time)`: @todocument
+- `to_days(time)`: @todocument
+- `to_weeks(time)`: @todocument
+- `to_years(time)`: @todocument
+
+- `calendar(time)`: @todocument
 
 extraction api
 --------------
-- `seconds(time)`
-- `minutes(time)`
-- `hours(time)`
-- `days(time)`
-- `weeks(time)`
-- `years(time)`
+- `seconds(time)`: @todocument
+- `minutes(time)`: @todocument
+- `hours(time)`: @todocument
+- `days(time)`: @todocument
+- `weeks(time)`: @todocument
+- `years(time)`: @todocument
 
 pretty printing
 ---------------
-- `ago(time)`
-- `in(time)`
+- `pretty(time)`: @todocument
+- `ago(time)`: @todocument
+- `in(time)`: @todocument
+
+format
+------
+- `format(time,string format[,string locale])`: @todocument
+- `locale(time,string locale[,string format])`: @todocument
+
+serialization
+-------------
+- `str(string)`: @todocument
+- `str(time)`: @todocument
 
 classes
 -------
-- `dt()`
-- `rtc()`
-- `fps()`
-- `chrono()`
-- `looper()`
+- `dt()`: @todocument
+- `fps()`: @todocument
+- `chrono()`: @todocument
+- `looper()`: @todocument
 
 tweening basics
 ---------------
-- `ping(delta)`
-- `pong(delta)`
-- `pingpong(delta)`
-- `sinus(delta)`
-- `tween(type,delta)`
+- `ping(delta)`: @todocument
+- `pong(delta)`: @todocument
+- `pingpong(delta)`: @todocument
+- `sinus(delta)`: @todocument
+- `tween(type,delta)`: @todocument
+- `type(type)`: @todocument
 
 tweening extra
 --------------
-- `linear(delta)`
-- `quadin(delta)`
-- `quadout(delta)`
-- `quadinout(delta)`
-- `cubicin(delta)`
-- `cubicout(delta)`
-- `cubicinout(delta)`
-- `quartin(delta)`
-- `quartout(delta)`
-- `quartinout(delta)`
-- `quintin(delta)`
-- `quintout(delta)`
-- `quintinout(delta)`
-- `sinein(delta)`
-- `sineout(delta)`
-- `sineinout(delta)`
-- `expoin(delta)`
-- `expoout(delta)`
-- `expoinout(delta)`
-- `circin(delta)`
-- `circout(delta)`
-- `circinout(delta)`
-- `elasticin(delta)`
-- `elasticout(delta)`
-- `elasticinout(delta)`
-- `backin(delta)`
-- `backout(delta)`
-- `backinout(delta)`
-- `bouncein(delta)`
-- `bounceout(delta)`
-- `bounceinout(delta)`
-- `sinesquare(delta)`
-- `exponential(delta)`
-- `terrys1(delta)`
-- `terrys2(delta)`
-- `terrys3(delta)`
-- `acelbreak(delta)`
-- `sinpi2(delta)`
+- `linear(delta)`: @todocument
+- `quadin(delta)`: @todocument
+- `quadout(delta)`: @todocument
+- `quadinout(delta)`: @todocument
+- `cubicin(delta)`: @todocument
+- `cubicout(delta)`: @todocument
+- `cubicinout(delta)`: @todocument
+- `quartin(delta)`: @todocument
+- `quartout(delta)`: @todocument
+- `quartinout(delta)`: @todocument
+- `quintin(delta)`: @todocument
+- `quintout(delta)`: @todocument
+- `quintinout(delta)`: @todocument
+- `sinein(delta)`: @todocument
+- `sineout(delta)`: @todocument
+- `sineinout(delta)`: @todocument
+- `expoin(delta)`: @todocument
+- `expoout(delta)`: @todocument
+- `expoinout(delta)`: @todocument
+- `circin(delta)`: @todocument
+- `circout(delta)`: @todocument
+- `circinout(delta)`: @todocument
+- `elasticin(delta)`: @todocument
+- `elasticout(delta)`: @todocument
+- `elasticinout(delta)`: @todocument
+- `backin(delta)`: @todocument
+- `backout(delta)`: @todocument
+- `backinout(delta)`: @todocument
+- `bouncein(delta)`: @todocument
+- `bounceout(delta)`: @todocument
+- `bounceinout(delta)`: @todocument
+- `sinesquare(delta)`: @todocument
+- `exponential(delta)`: @todocument
+- `terrys1(delta)`: @todocument
+- `terrys2(delta)`: @todocument
+- `terrys3(delta)`: @todocument
+- `acelbreak(delta)`: @todocument
+- `sinpi2(delta)`: @todocument
 
 sample
 ------

@@ -236,16 +236,16 @@ namespace sand
         offset += t;
     }
 
-    std::string format( uint64_t timestamp_secs, const std::string &locale )
+    std::string locale( double tsecs, const std::string &_locale, const std::string &format )
     {
         try {
             std::string locale; // = "es-ES", "Chinese_China.936", "en_US.UTF8", etc...
-            std::time_t t = timestamp_secs;
+            std::time_t t = (uint64_t)tsecs;
                 std::tm tm = *std::localtime(&t);
             std::stringstream ss;
 #if 1
-                ss.imbue( std::locale( locale.empty() ? std::locale("").name() : locale ) );
-                ss << std::put_time( &tm, "%c" );
+                ss.imbue( std::locale( _locale.empty() ? std::locale("").name() : _locale ) );
+                ss << std::put_time( &tm, format.empty() ? "%c" : format.c_str() );
 #else
 #   ifdef _MSC_VER
                 // msvc crashes on %z and %Z
@@ -259,6 +259,48 @@ namespace sand
         catch(...) {
         }
         return std::string();
+    }
+
+    std::string format( double t, const std::string &_format, const std::string &_locale )
+    {
+#if 0
+        char pBuffer[80];
+
+        struct tm * timeinfo;
+        time_t stored = (time_t)( t );
+        timeinfo = localtime ( &stored );
+        strftime(pBuffer, 80, _format.c_str(), timeinfo);
+
+        return pBuffer;
+#else
+        return locale( t, _locale, _format );
+#endif
+    }
+
+
+    double str( const std::string &timestamp_YMDhms ) {
+        std::deque< custom > token = custom( timestamp_YMDhms ).tokenize(":-/ "); //:)
+
+        if( token.size() < 6 )
+            return 0;
+
+        struct tm timeinfo;
+
+        //months are in [0..] range where days, hours, mins and secs use [1..] (doh!)
+        timeinfo.tm_year  = token[0].as<int>() - 1900;
+        timeinfo.tm_mon   = token[1].as<int>() - 1;
+        timeinfo.tm_mday  = token[2].as<int>();
+        timeinfo.tm_hour  = token[3].as<int>();
+        timeinfo.tm_min   = token[4].as<int>();
+        timeinfo.tm_sec   = token[5].as<int>();
+        //-1 = do not adjust daylight savings
+        timeinfo.tm_isdst = -1;
+
+        return double( mktime( &timeinfo ) );
+    }
+
+    std::string str( double t ) {
+        return format( t, "%Y-%m-%d %H:%M:%S" );
     }
 
     void wink() {
@@ -297,8 +339,15 @@ namespace sand
     double weeks( double t ) {
         return t * days(7);
     }
+    double months( double t ) {
+        return t * ( weeks(t) / 4 );
+    }
     double years( double t ) {
         return t * days(365.242190402); // + days(n/4);
+    }
+
+    double calendar( const std::string &YMDhms ) {
+        return str( YMDhms );
     }
 
     double to_nanoseconds( double t ) {
@@ -325,10 +374,32 @@ namespace sand
     double to_weeks( double t ) {
         return t / days(7);
     }
+    double to_months( double t ) {
+        return t / ( to_weeks(t) / 4 );
+    }
     double to_years( double t ) {
         return t / days(365.242190402); // + days(n/4);
     }
 
+    int year( double t ) {
+        return custom( format(t, "%Y") ).as<int>();
+    }
+    int month( double t ) {
+        return custom( format(t, "%m") ).as<int>();
+    }
+    int day( double t ) {
+        return custom( format(t, "%d") ).as<int>();
+    }
+
+    int hour( double t ) {
+        return custom( format(t, "%H") ).as<int>();
+    }
+    int minute( double t ) {
+        return custom( format(t, "%M") ).as<int>();
+    }
+    int second( double t ) {
+        return custom( format(t, "%S") ).as<int>();
+    }
 
     float ping( float dt01 ) {
         return dt01;
@@ -720,7 +791,7 @@ namespace sand
 
 #   undef $with
 
-    const char *str( int type )
+    const char *type( int type )
     {
         switch(type)
         {
@@ -774,154 +845,6 @@ namespace sand
 
 #       undef $with
         }
-    }
-}
-
-namespace sand
-{
-    // object time (in seconds.microseconds)
-    time_t rtc::time_obj()
-    {
-        return creation + time_t( factor * dt.s() );
-    }
-
-    time_t rtc::elapsed()
-    {
-        return time_t( factor * dt.s() );
-    }
-
-    rtc::rtc() : factor( 1.0 )
-    {
-        set( double( std::time( 0 ) ) );
-    }
-
-    rtc::rtc( const std::string &import ) : factor( 1.0 )
-    {
-        this->str( import );
-    }
-
-    void rtc::reset() //useful?
-    {
-        set( 0 );
-    }
-
-    void rtc::set( const double &t )
-    {
-        held = false;
-        creation = time_t( t );
-        dt.reset();
-    }
-
-    void rtc::shift( double f ) // factor(), phase(), speed() instead?
-    {
-        assert( f > 0.0 );
-
-        factor = f;
-    }
-
-    void rtc::pause()
-    {
-        held = true;
-    }
-
-    double rtc::resume()
-    {
-        held = false;
-
-        return double( time_obj() - creation );
-    }
-
-    double rtc::update()
-    {
-        //return double( creation = ( held ? creation : time_obj() ) );
-
-        if( held )
-            return double( creation );
-
-        set( double( creation ) + elapsed() );
-
-        return double( creation );
-    }
-
-    double rtc::get() const
-    {
-        return double( creation );
-    }
-
-    rtc::operator double() const
-    {
-        return get();
-    }
-
-    std::string rtc::format( const std::string &fmt ) const
-    {
-        char pBuffer[80];
-
-        struct tm * timeinfo;
-        time_t stored = (time_t)( get() );
-        timeinfo = localtime ( &stored );
-        strftime(pBuffer, 80, fmt.c_str(), timeinfo);
-
-        return pBuffer;
-    }
-
-    int rtc::Y() const
-    {
-        return custom( format("%Y") ).as<int>();
-    }
-    int rtc::M() const
-    {
-        return custom( format("%m") ).as<int>();
-    }
-    int rtc::D() const
-    {
-        return custom( format("%d") ).as<int>();
-    }
-
-    int rtc::h() const
-    {
-        return custom( format("%H") ).as<int>();
-    }
-    int rtc::m() const
-    {
-        return custom( format("%M") ).as<int>();
-    }
-    int rtc::s() const
-    {
-        return custom( format("%S") ).as<int>();
-    }
-
-    std::string rtc::str() const
-    {
-        return format( "%Y-%m-%d %H:%M:%S" );
-    }
-
-    void rtc::str( const std::string& import )
-    {
-        std::deque< custom > token = custom( import ).tokenize(":-/ "); //:)
-
-        //assert( token.size() >= 6 );
-
-        if( token.size() < 6 )
-        {
-            set( 0 );
-            return;
-        }
-
-        struct tm timeinfo;
-
-        //months are in [0..] range where days, hours, mins and secs use [1..] (doh!)
-        timeinfo.tm_year  = token[0].as<int>() - 1900;
-        timeinfo.tm_mon   = token[1].as<int>() - 1;
-        timeinfo.tm_mday  = token[2].as<int>();
-        timeinfo.tm_hour  = token[3].as<int>();
-        timeinfo.tm_min   = token[4].as<int>();
-        timeinfo.tm_sec   = token[5].as<int>();
-        //-1 = do not adjust daylight savings
-        timeinfo.tm_isdst = -1;
-
-        factor = 1.0; //ahem
-        set( double( mktime( &timeinfo ) ) );
     }
 }
 
@@ -1029,6 +952,10 @@ namespace sand
         if( day_diff < 365 ) return std::string("in ") + std::to_string(sand::ceil(day_diff/31)) + " months";
         if( day_diff < 730 ) return "in a year";
         return std::string("in ") + std::to_string(sand::ceil(day_diff/365)) + " years";
+    }
+
+    std::string pretty( double diff_seconds ) {
+        return diff_seconds < 0 ? ago(diff_seconds) : in(diff_seconds);
     }
 }
 
