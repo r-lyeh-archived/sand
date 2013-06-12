@@ -57,6 +57,8 @@ namespace sand
     int year( double timestamp );
 
     // pretty printing
+    std::string diff( double since );
+    std::string diff( double since, double then );
     std::string pretty( double t );
     std::string ago( double t );
     std::string in( double t );
