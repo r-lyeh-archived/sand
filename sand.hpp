@@ -16,7 +16,7 @@ namespace sand
     // seconds since unix epoch (hires)
     double now();
     // seconds since start of program (hires)
-    double runtime();
+    double uptime();
     // advance all clocks specified time (for QA and testing purposes)
     void lapse( double t );
     // void pause( bool on = false ) {}
@@ -57,6 +57,8 @@ namespace sand
     int year( double timestamp );
 
     // pretty printing
+    std::string diff( double since );
+    std::string diff( double since, double then );
     std::string pretty( double t );
     std::string ago( double t );
     std::string in( double t );

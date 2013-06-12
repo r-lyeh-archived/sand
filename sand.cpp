@@ -41,9 +41,10 @@
 #include <cmath>
 #include <ctime>
 
-#include <deque>
 #include <chrono>
+#include <deque>
 #include <iomanip>
+#include <map>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -63,6 +64,7 @@
 #   define kSandTimerWink( units_t )             Sleep( units_t )
 #else
 #   include <sys/time.h>
+#   include <unistd.h>
 #   define $unix    $yes
 //  hmmm... check clock_getres() as seen in http://tdistler.com/2010/06/27/high-performance-timing-on-linux-windows#more-350
 //  frequency int clock_getres(clockid_t clock_id, struct timespec *res);
@@ -93,6 +95,20 @@
 
 #define $yes(...) __VA_ARGS__
 #define $no(...)
+
+#if defined(__GNUC__) && (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__ < 40800 )
+    namespace std
+    {
+        static std::string put_time( const std::tm* tmb, const char* fmt ) {
+            std::string s( 128, '\0' );
+            while( !strftime( &s[0], s.size(), fmt, tmb ) )
+                s.resize( s.size() + 128 );
+            return s;
+        }
+    }
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
 
 namespace sand
 {
@@ -228,7 +244,7 @@ namespace sand
         return offset + local.s() + app_epoch;
     }
 
-    double runtime() {
+    double uptime() {
         return offset + local.s();
     }
 
@@ -244,7 +260,8 @@ namespace sand
                 std::tm tm = *std::localtime(&t);
             std::stringstream ss;
 #if 1
-                ss.imbue( std::locale( _locale.empty() ? std::locale("").name() : _locale ) );
+                std::locale lc( _locale.c_str() );
+                ss.imbue( lc );
                 ss << std::put_time( &tm, format.empty() ? "%c" : format.c_str() );
 #else
 #   ifdef _MSC_VER
@@ -425,6 +442,13 @@ namespace sand
 
     float tween( int tweener_type, float current )
     {
+        auto sin  = []( double t ) -> float { return float( std::sin(t) ); };
+        auto cos  = []( double t ) -> float { return float( std::cos(t) ); };
+        auto exp  = []( double t ) -> float { return float( std::exp(t) ); };
+        auto sqrt = []( double t ) -> float { return float( std::sqrt(t) ); };
+        auto abs  = []( double t ) -> float { return float( std::abs(t) ); };
+        auto pow  = []( double t, double e ) -> float { return float( std::pow(t,e) ); };
+
         const bool looped = false;
         const float pi = 3.1415926535897932384626433832795f;
         const float d = /*total=*/ 1.f;
@@ -464,13 +488,13 @@ namespace sand
         case TYPE::SINPI2_01:
             {
                 float fDelta = t/d;
-                return std::sin(fDelta * 0.5f * pi);
+                return sin(fDelta * 0.5f * pi);
             }
 
         case TYPE::ACELBREAK_01:
             {
                 float fDelta = t/d;
-                return (std::sin((fDelta * pi) - (pi * 0.5f)) + 1.0f) * 0.5f;
+                return (sin((fDelta * pi) - (pi * 0.5f)) + 1.0f) * 0.5f;
             }
 
         case TYPE::BACKIN_01:
@@ -554,20 +578,20 @@ namespace sand
 
         case TYPE::CIRCIN_01:
             t /= d;
-            return 1.f - std::sqrt(1 - t*t);
+            return 1.f - sqrt(1 - t*t);
 
         case TYPE::CIRCOUT_01:
             t /= d;
             t--;
-            return std::sqrt(1 - t*t);
+            return sqrt(1 - t*t);
 
         case TYPE::CIRCINOUT_01:
             t /= d/2;
             if(t < 1)
-                return -1.f/2 * (std::sqrt(1 - t*t) - 1);
+                return -1.f/2 * (sqrt(1 - t*t) - 1);
 
             t-=2;
-            return 1.f/2 * (std::sqrt(1 - t*t) + 1);
+            return 1.f/2 * (sqrt(1 - t*t) + 1);
 
 
         case TYPE::ELASTICIN_01:
@@ -577,9 +601,9 @@ namespace sand
                 float p=d*.3f;
                 float a=1.f;
                 float s=p/4;
-                float postFix =a*std::pow(2,10*(t-=1)); // this is a fix, again, with post-increment operators
+                float postFix =a*pow(2,10*(t-=1)); // this is a fix, again, with post-increment operators
 
-                return -(postFix * std::sin((t*d-s)*(2*pi)/p ));
+                return -(postFix * sin((t*d-s)*(2*pi)/p ));
             }
 
         case TYPE::ELASTICOUT_01:
@@ -588,7 +612,7 @@ namespace sand
                 float a=1.f;
                 float s=p/4;
 
-                return (a*std::pow(2,-10*t) * std::sin( (t*d-s)*(2*pi)/p ) + 1.f);
+                return (a*pow(2,-10*t) * sin( (t*d-s)*(2*pi)/p ) + 1.f);
             }
 
         case TYPE::ELASTICINOUT_01:
@@ -600,27 +624,27 @@ namespace sand
                 float s=p/4;
 
                 if (t < 1) {
-                    float postFix =a*std::pow(2,10*(t-=1)); // postIncrement is evil
-                    return -.5f*(postFix* std::sin( (t*d-s)*(2*pi)/p ));
+                    float postFix =a*pow(2,10*(t-=1)); // postIncrement is evil
+                    return -.5f*(postFix* sin( (t*d-s)*(2*pi)/p ));
                 }
 
-                float postFix =  a*std::pow(2,-10*(t-=1)); // postIncrement is evil
-                return postFix * std::sin( (t*d-s)*(2*pi)/p )*.5f + 1.f;
+                float postFix =  a*pow(2,-10*(t-=1)); // postIncrement is evil
+                return postFix * sin( (t*d-s)*(2*pi)/p )*.5f + 1.f;
             }
 
         case TYPE::EXPOIN_01:
-            return std::pow(2, 10 * (t/d - 1));
+            return pow(2, 10 * (t/d - 1));
 
         case TYPE::EXPOOUT_01:
-            return 1.f - ( t == d ? 0 : std::pow(2, -10.f * (t/d)));
+            return 1.f - ( t == d ? 0 : pow(2, -10.f * (t/d)));
 
         case TYPE::EXPOINOUT_01:
             t /= d/2;
             if (t < 1)
-                return 1.f/2 * std::pow(2, 10 * (t - 1));
+                return 1.f/2 * pow(2, 10 * (t - 1));
 
             t--;
-            return 1.f/2 * (-std::pow(2, -10 * t) + 2);
+            return 1.f/2 * (-pow(2, -10 * t) + 2);
 
         case TYPE::QUADIN_01:
             t /= d;
@@ -634,7 +658,6 @@ namespace sand
             t /= d/2;
             if(t < 1)
                 return (1.f/2*t*t);
-
             t--;
             return -1.f/2 * (t*(t-2) - 1);
 
@@ -651,7 +674,6 @@ namespace sand
             t /= d/2;
             if (t < 1)
                 return 1.f/2*t*t*t;
-
             t -= 2;
             return 1.f/2*(t*t*t + 2);
 
@@ -668,7 +690,6 @@ namespace sand
             t /= d/2;
             if(t < 1)
                 return 1.f/2*t*t*t*t;
-
             t -= 2;
             return -1.f/2 * (t*t*t*t - 2);
 
@@ -685,50 +706,49 @@ namespace sand
             t /= d/2;
             if(t < 1)
                 return 1.f/2*t*t*t*t*t;
-
             t -= 2;
             return 1.f/2*(t*t*t*t*t + 2);
 
         case TYPE::SINEIN_01:
-            return 1.f - std::cos(t/d * (pi/2));
+            return 1.f - cos(t/d * (pi/2));
 
         case TYPE::SINEOUT_01:
-            return std::sin(t/d * (pi/2));
+            return sin(t/d * (pi/2));
 
         case TYPE::SINEINOUT_01:
-            return -1.f/2 * (std::cos(pi*t/d) - 1);
+            return -1.f/2 * (cos(pi*t/d) - 1);
 
 
         case TYPE::SINESQUARE:
             {
-                float A = std::sin(0.5f*(t/d)*pi);
+                float A = sin(0.5f*(t/d)*pi);
                 return A*A;
             }
 
         case TYPE::EXPONENTIAL:
             {
-                return 1/(1+std::exp(6-12*(t/d)));
+                return 1/(1+exp(6-12*(t/d)));
             }
 
         case TYPE::SCHUBRING1:
             {
                 t /= d;
-                return 2*(t+(0.5f-t)*std::abs(0.5f-t))-0.5f;
+                return 2*(t+(0.5f-t)*abs(0.5f-t))-0.5f;
             }
 
         case TYPE::SCHUBRING2:
             {
                 t /= d;
-                float p1pass= 2*(t+(0.5f-t)*std::abs(0.5f-t))-0.5f;
-                float p2pass= 2*(p1pass+(0.5f-p1pass)*std::abs(0.5f-p1pass))-0.5f;
+                float p1pass= 2*(t+(0.5f-t)*abs(0.5f-t))-0.5f;
+                float p2pass= 2*(p1pass+(0.5f-p1pass)*abs(0.5f-p1pass))-0.5f;
                 return p2pass;
             }
 
         case TYPE::SCHUBRING3:
             {
                 t /= d;
-                float p1pass= 2*(t+(0.5f-t)*std::abs(0.5f-t))-0.5f;
-                float p2pass= 2*(p1pass+(0.5f-p1pass)*std::abs(0.5f-p1pass))-0.5f;
+                float p1pass= 2*(t+(0.5f-t)*abs(0.5f-t))-0.5f;
+                float p2pass= 2*(p1pass+(0.5f-p1pass)*abs(0.5f-p1pass))-0.5f;
                 float pAvg=(p1pass+p2pass)/2;
                 return pAvg;
             }
@@ -850,63 +870,52 @@ namespace sand
 
 namespace sand
 {
-    fps::fps() : frames(0), frames_per_second(0), format("0 fps")
-    {}
-
-    bool fps::tick()
+    struct fps_t
     {
-        frames++;
+        sand::dt dt, frame_limiter, frame_timer;
+        double wait_seconds, taken, frames_per_second;
+        size_t frames;
 
-        history.push_back( frame_timer.s() );
-        if( history.size() > 60*2 ) history.pop_front();
-        frame_timer.reset();
+        fps_t() : frames(0), frames_per_second(0), wait_seconds(0), taken(0)
+        {}
+    };
 
-        double sec = dt.s();
-        if( sec >= 0.5 )
-        {
-            frames_per_second = frames,
-            frames = 0;
-
-            format = ( frames_per_second >= 1 || frames_per_second == 0 ?
-                std::to_string( int( frames_per_second / sec ) ) + " fps" :
-                std::to_string( int( sec / frames_per_second ) ) + " spf" );
-
-            frames_per_second /= sec;
-
-            dt.reset();
-
-            return true;
-        }
-
-        return false;
+    fps_t &get( int id ) {
+        static std::map<int, fps_t> map;
+        return map[id];
     }
 
-    void fps::wait( double frames_per_second )
-    {
+    void tick( int id, double hz ) {
+        auto &fps = get(id);
+
+        fps.taken = fps.frame_timer.s();
+        fps.frame_timer.reset();
+        fps.frames++;
+
+        double sec = fps.dt.s();
+        if( sec >= 0.5 ) {
+            fps.frames_per_second = fps.frames;
+            fps.frames = 0;
+
+            fps.frames_per_second /= sec;
+
+            fps.dt.reset();
+        }
+
+        if( hz > 0 ) fps.wait_seconds = 1.0/hz;
+        if( fps.wait_seconds > 1 ) fps.wait_seconds = 1;
+        fps.wait_seconds -= fps.taken;
+    }
+
+    double fps( int id ) {
+        auto &fps = get(id);
+        return fps.frames_per_second;
+    }
+
+    double ahead( int id ) {
         // @todo: [evaluate] http://gafferongames.com/game-physics/fix-your-timestep/
-
-        if( frames_per_second > 0 )
-        {
-            double seconds = 1.0/frames_per_second;
-            if( seconds > 1 ) seconds = 1;
-            do sand::wink(); while( frame_limiter.s() < seconds ); //yield()?
-            frame_limiter.reset();
-        }
-    }
-
-    std::deque< float > fps::get_history() const
-    {
-        return history;
-    }
-
-    std::string fps::str() const
-    {
-        return format;
-    }
-
-    size_t fps::get() const
-    {
-        return frames_per_second;
+        auto &fps = get(id);
+        return fps.wait_seconds;
     }
 }
 
@@ -914,15 +923,15 @@ namespace sand
 {
     std::string ago( double diff_seconds ) {
         // based on code by John Resig (jquery.com)
-        int diff = abs(diff_seconds);
-        int day_diff = sand::floor(diff / 86400);
+        int abs_diff = int(std::abs(diff_seconds));
+        int day_diff = sand::floor(abs_diff / 86400);
 
         if( day_diff == 0 ) {
-            if( diff_seconds <   60 ) return "just now";
-            if( diff_seconds <  120 ) return "a minute ago";
-            if( diff_seconds < 3600 ) return std::to_string(sand::floor(diff/60)) + " minutes ago";
-            if( diff_seconds < 7200 ) return "an hour ago";
-            return std::to_string( sand::floor(diff/3600) ) + " hours ago";
+            if( abs_diff <   60 ) return "just now";
+            if( abs_diff <  120 ) return "a minute ago";
+            if( abs_diff < 3600 ) return std::to_string(sand::floor(abs_diff/60)) + " minutes ago";
+            if( abs_diff < 7200 ) return "an hour ago";
+            return std::to_string( sand::floor(abs_diff/3600) ) + " hours ago";
         }
         if( day_diff ==  1 ) return "yesterday";
         if( day_diff <= 13 ) return std::to_string(day_diff) + " days ago";
@@ -935,15 +944,15 @@ namespace sand
 
     std::string in( double diff_seconds ) {
         // based on code by John Resig (jquery.com)
-        int diff = abs(diff_seconds);
-        int day_diff = sand::floor(diff / 86400);
+        int abs_diff = int(std::abs(diff_seconds));
+        int day_diff = sand::floor(abs_diff / 86400);
 
         if( day_diff == 0 ) {
-            if( diff_seconds <   60 ) return "right now";
-            if( diff_seconds <  120 ) return "in a minute";
-            if( diff_seconds < 3600 ) return std::string("in ") + std::to_string(sand::floor(diff/60)) + " minutes";
-            if( diff_seconds < 7200 ) return "in an hour";
-            return std::string("in ") + std::to_string( sand::floor(diff/3600) ) + " hours ago";
+            if( abs_diff <   60 ) return "right now";
+            if( abs_diff <  120 ) return "in a minute";
+            if( abs_diff < 3600 ) return std::string("in ") + std::to_string(sand::floor(abs_diff/60)) + " minutes";
+            if( abs_diff < 7200 ) return "in an hour";
+            return std::string("in ") + std::to_string( sand::floor(abs_diff/3600) ) + " hours ago";
         }
         if( day_diff ==  1 ) return "tomorrow";
         if( day_diff <= 13 ) return std::string("in ") + std::to_string(day_diff) + " days";
@@ -956,6 +965,15 @@ namespace sand
 
     std::string pretty( double diff_seconds ) {
         return diff_seconds < 0 ? ago(diff_seconds) : in(diff_seconds);
+    }
+
+    std::string diff( double since, double then ) {
+        double diff_seconds = abs(then) - abs(since);
+        return pretty( diff_seconds );
+    }
+
+    std::string diff( double then ) {
+        return diff( then, now() );
     }
 }
 

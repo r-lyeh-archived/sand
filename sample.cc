@@ -44,9 +44,14 @@ int main()
     assert( pretty( days(-1) ) == "yesterday" );
     assert( pretty( days(+1) ) == "tomorrow" );
 
+    std::cout << diff( now(), now() + days(1) ) << std::endl;
+    std::cout << diff( now(), now() - days(1) ) << std::endl;
+    std::cout << diff( now(), now() + days(-1) ) << std::endl;
+    std::cout << diff( now(), now() - days(-1) ) << std::endl;
+
     assert( dt().ns() > 0 );
 
-    std::cout << ago( now() - calendar("1970-01-01 00:00:00") ) << std::endl;
+    std::cout << diff( calendar("1970-01-01 00:00:00"), now() ) << std::endl;
 
     {
         auto
@@ -93,7 +98,7 @@ int main()
         assert( second(then) == 59 );
 
         std::cout << "[ ] print ";
-            std::cout << "- rtc : " << std::setprecision(20) << rtc << " -> " << str(rtc) << " -> " << pretty(now() - rtc);
+            std::cout << "- rtc : " << std::setprecision(20) << rtc << " -> " << str(rtc) << " -> " << diff(now(), rtc);
             std::cout << "\r[x]" << std::endl;
 
         std::cout << "[ ] serialization ";
@@ -101,7 +106,7 @@ int main()
             std::cout << "\r[x]" << std::endl;
 
         std::cout << "[ ] print ";
-            std::cout << "- then : " << std::setprecision(20) << then << " -> " << str(then) << " -> " << pretty(then - now());
+            std::cout << "- then : " << std::setprecision(20) << then << " -> " << str(then) << " -> " << diff(then, now());
             std::cout << "\r[x]" << std::endl;
 
         std::cout << "[ ] serialization ";
