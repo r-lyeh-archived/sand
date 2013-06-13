@@ -11,7 +11,7 @@ int main()
     double then = now();
     std::cout << to_nanoseconds(now() - then) << std::endl;
 
-    std::cout << runtime() << std::endl;
+    std::cout << uptime() << std::endl;
 
     std::cout << locale( now(), "us-EN" ) << std::endl;
     std::cout << locale( now(), "es-ES" ) << std::endl;

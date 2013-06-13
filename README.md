@@ -124,7 +124,7 @@ tweening extra
 
 sample
 ------
-```
+```c++
 ```
 
 possible output
