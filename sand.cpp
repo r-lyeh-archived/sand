@@ -236,11 +236,11 @@ namespace sand
     namespace
     {
         double offset = 0;
-        const double app_epoch = double( std::time(NULL) );
         legacy::dt local;
     }
 
     double now() {
+        static const double app_epoch = double( std::time(NULL) );
         return offset + local.s() + app_epoch;
     }
 
