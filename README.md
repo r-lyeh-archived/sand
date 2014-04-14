@@ -1,7 +1,7 @@
 sand
 ====
 
-- Sand is a lightweight and simple time framework written in C++11.
+- Sand is a lightweight and simple time library written in C++11.
 - Sand supports Unix stamps, hires timers, calendars, locales and tweening.
 - Tiny. One header and one source file.
 - Cross-platform. Builds on Windows/Linux/MacosX. Compiles on g++/clang/msvc.
