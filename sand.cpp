@@ -33,6 +33,7 @@
  * - kiloseconds, ks | ref: http://bavardage.github.com/Kiloseconds/
  * - something like http://momentjs.com/ for pretty printing
  * - also, https://code.google.com/p/datejs/
+ * - #include <omp.h> consider double omp_get_wtime(); as well
 
  * - rlyeh ~~ listening to The Mission / Butterfly on a wheel
  */
