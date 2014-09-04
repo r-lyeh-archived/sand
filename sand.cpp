@@ -1,9 +1,11 @@
 /* Sand is a lightweight and simple time framework written in C++11.
  * Sand supports Unix stamps, hires timers, calendars, locales and tweening.
- * Copyright (c) 2010-2013 Mario 'rlyeh' Rodriguez
+ * Copyright (c) 2010-2014 Mario 'rlyeh' Rodriguez
 
  * Based on code by Robert Penner, GapJumper, Terry Schubring, Jesus Gollonet,
  * Tomas Cepeda, John Resig. Thanks guys! :-)
+ *
+ * Simple fps framerate locker. based on code by /u/concavator (ref: http://goo.gl/Ry50A4)
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,7 +35,6 @@
  * - kiloseconds, ks | ref: http://bavardage.github.com/Kiloseconds/
  * - something like http://momentjs.com/ for pretty printing
  * - also, https://code.google.com/p/datejs/
- * - #include <omp.h> consider double omp_get_wtime(); as well
 
  * - rlyeh ~~ listening to The Mission / Butterfly on a wheel
  */
@@ -53,12 +54,11 @@
 
 #include "sand.hpp"
 
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(_WIN32)
 #   include <Windows.h>
-#   define $windows $yes
 #   define kSandTimerHandle                      LARGE_INTEGER
 #   define kSandTimerFreq( handle )              { kSandTimerHandle fhandle; DWORD_PTR oldmask = ::SetThreadAffinityMask(::GetCurrentThread(), 0); ::QueryPerformanceFrequency( &fhandle ); ::SetThreadAffinityMask(::GetCurrentThread(), oldmask); frequency = 1000000.0 / double(fhandle.QuadPart); }
-#   define kSandTimerUpdate( handle )            {                          DWORD_PTR oldmask = ::SetThreadAffinityMask(::GetCurrentThread(), 0); ::QueryPerformanceCounter  ( &handle ); ::SetThreadAffinityMask(::GetCurrentThread(), oldmask); }
+#   define kSandTimerUpdate( handle )            {                           DWORD_PTR oldmask = ::SetThreadAffinityMask(::GetCurrentThread(), 0); ::QueryPerformanceCounter  ( &handle ); ::SetThreadAffinityMask(::GetCurrentThread(), oldmask); }
 #   define kSandTimerSetCounter( handle, value ) handle.QuadPart = value
 #   define kSandTimerDiffCounter( handle1, handle2 ) ( ( handle2.QuadPart - handle1.QuadPart ) * frequency )
 #   define kSandTimerSleep( seconds_f )          Sleep( (int)(seconds_f * 1000) )
@@ -66,7 +66,6 @@
 #else
 #   include <sys/time.h>
 #   include <unistd.h>
-#   define $unix    $yes
 //  hmmm... check clock_getres() as seen in http://tdistler.com/2010/06/27/high-performance-timing-on-linux-windows#more-350
 //  frequency int clock_getres(clockid_t clock_id, struct timespec *res);
 //  clock     int clock_gettime(clockid_t clock_id, struct timespec *tp);
@@ -82,16 +81,27 @@
 //    ::sleep( int(intpart) ); usleep( int(fractpart * 1000000) ); } while( 0 )
 #endif
 
-#ifdef  $windows
-#define $welse $no
-#else
-#define $welse $yes
+#ifdef SAND_USE_OMP_TIMERS
+// todo: test this
+#include <omp.h>
+#undef  kSandTimerHandle
+#define kSandTimerHandle                            double
+#undef  kSandTimerFreq
+#define kSandTimerFreq( handle )
+#undef  kSandTimerUpdate
+#define kSandTimerUpdate( handle )                  { handle = omp_get_wtime(); }
+#undef  kSandTimerSetCounter
+#define kSandTimerSetCounter( handle, value )       ( handle = value / 1000000.0 )
+#undef  kSandTimerDiffCounter
+#define kSandTimerDiffCounter( handle1, handle2 )   ( handle2 - handle1 )
 #endif
 
-#ifdef  $unix
-#define $uelse $no
+#ifdef  _MSC_VER
+#define $msc   $yes
+#define $melse $no
 #else
-#define $uelse $yes
+#define $msc   $no
+#define $melse $yes
 #endif
 
 #define $yes(...) __VA_ARGS__
@@ -129,46 +139,26 @@ namespace
         {}
 
         template<typename T>
-        custom( const T &t ) : std::string()
-        {
+        custom( const T &t ) : std::string() {
             std::stringstream ss;
-            if( ss << t )
-                this->assign( ss.str() );
+            if( ss << t ) this->assign( ss.str() );
         }
 
-        std::deque<custom> tokenize( const std::string &chars ) const
-        {
+        std::deque< custom > tokenize( const std::string &delimiters ) const { // taken from wire::string::tokenize
             std::string map( 256, '\0' );
-
-            for( auto it = chars.begin(), end = chars.end(); it != end; ++it )
-                map[ *it ] = '\1';
-
-            std::deque<custom> tokens;
-
-            tokens.push_back( custom() );
-
-            for( int i = 0, end = this->size(); i < end; ++i )
-            {
-                unsigned char c = at(i);
-
-                std::string &str = tokens.back();
-
-                if( !map.at(c) )
-                    str.push_back( c );
-                else
-                if( str.size() )
-                    tokens.push_back( custom() );
+            for( const unsigned char &ch : delimiters )
+                map[ ch ] = '\1';
+            std::deque< custom > tokens(1);
+            for( const unsigned char &ch : *this ) {
+                /**/ if( !map.at(ch)          ) tokens.back().push_back( char(ch) );
+                else if( tokens.back().size() ) tokens.push_back( custom() );
             }
-
-            while( tokens.size() && !tokens.back().size() )
-                tokens.pop_back();
-
+            while( tokens.size() && !tokens.back().size() ) tokens.pop_back();
             return tokens;
         }
 
         template <typename T>
-        T as() const
-        {
+        T as() const {
             T t;
             std::stringstream ss;
             ss << *this;
@@ -253,33 +243,33 @@ namespace sand
         offset += t;
     }
 
-    std::string locale( double tsecs, const std::string &_locale, const std::string &format )
-    {
+    std::string locale( double timestamp_secs, const std::string &locale_, const std::string &format ) { // taken from sole::printftime 
+        std::string timef;
         try {
-            std::string locale; // = "es-ES", "Chinese_China.936", "en_US.UTF8", etc...
-            std::time_t t = (uint64_t)tsecs;
-                std::tm tm = *std::localtime(&t);
+            std::time_t t = uint64_t( timestamp_secs );
+            std::tm tm;
+            $msc(
+                localtime_s( &tm, &t );
+            )
+            $melse(
+                localtime_r( &t, &tm );
+            )
+
             std::stringstream ss;
-#if 1
-                std::locale lc( _locale.c_str() );
-                ss.imbue( lc );
-                ss << std::put_time( &tm, format.empty() ? "%c" : format.c_str() );
-#else
-#   ifdef _MSC_VER
-                // msvc crashes on %z and %Z
-                ss << std::put_time( &tm, "%Y-%m-%d %H:%M:%S" );
-#   else
-                ss << std::put_time( &tm, "%Y-%m-%d %H:%M:%S %z" );
-#   endif
-#endif
-            return ss.str();
+
+            std::locale lc( locale_.c_str() );
+            ss.imbue( lc );
+            ss << std::put_time( &tm, format.empty() ? "%c" : format.c_str() );
+
+            timef = ss.str();
         }
         catch(...) {
+            timef = "";
         }
-        return std::string();
+        return timef;
     }
 
-    std::string format( double t, const std::string &_format, const std::string &_locale )
+    std::string format( double t, const std::string &format_, const std::string &locale_ )
     {
 #if 0
         char pBuffer[80];
@@ -287,11 +277,11 @@ namespace sand
         struct tm * timeinfo;
         time_t stored = (time_t)( t );
         timeinfo = localtime ( &stored );
-        strftime(pBuffer, 80, _format.c_str(), timeinfo);
+        strftime(pBuffer, 80, format_.c_str(), timeinfo);
 
         return pBuffer;
 #else
-        return locale( t, _locale, _format );
+        return locale( t, locale_, format_ );
 #endif
     }
 
@@ -869,56 +859,6 @@ namespace sand
     }
 }
 
-namespace sand
-{
-    struct fps_t
-    {
-        sand::dt dt, frame_limiter, frame_timer;
-        double wait_seconds, taken, frames_per_second;
-        size_t frames;
-
-        fps_t() : frames(0), frames_per_second(0), wait_seconds(0), taken(0)
-        {}
-    };
-
-    fps_t &get( int id ) {
-        static std::map<int, fps_t> map;
-        return map[id];
-    }
-
-    void tick( int id, double hz ) {
-        auto &fps = get(id);
-
-        fps.taken = fps.frame_timer.s();
-        fps.frame_timer.reset();
-        fps.frames++;
-
-        double sec = fps.dt.s();
-        if( sec >= 0.5 ) {
-            fps.frames_per_second = fps.frames;
-            fps.frames = 0;
-
-            fps.frames_per_second /= sec;
-
-            fps.dt.reset();
-        }
-
-        if( hz > 0 ) fps.wait_seconds = 1.0/hz;
-        if( fps.wait_seconds > 1 ) fps.wait_seconds = 1;
-        fps.wait_seconds -= fps.taken;
-    }
-
-    double fps( int id ) {
-        auto &fps = get(id);
-        return fps.frames_per_second;
-    }
-
-    double ahead( int id ) {
-        // @todo: [evaluate] http://gafferongames.com/game-physics/fix-your-timestep/
-        auto &fps = get(id);
-        return fps.wait_seconds;
-    }
-}
 
 namespace sand
 {
@@ -990,7 +930,86 @@ namespace sand
 
 #undef $yes
 #undef $no
-#undef $uelse
-#undef $unix
-#undef $welse
-#undef $windows
+#undef $melse
+#undef $msc
+
+
+
+
+// simple fps framerate locker. based on code by /u/concavator (ref: http://goo.gl/Ry50A4)
+// - rlyeh. mit licensed
+
+#include <chrono>
+#include <thread>
+#include <iostream>
+#include <iomanip>
+#include <string>
+#include <algorithm>
+
+namespace {
+    // function that locks your logic to desired framerate (in HZ).
+    // if optional FPS arg is provided, function fills it up with number of frames per second.
+    // returns true if you should render your game after logic update; else update logic only.
+    bool lock_impl( unsigned HZ, unsigned *FPS ) {
+        // rw vars
+        static volatile unsigned hz = 60, isGameRunning = 1, maxframeskip = 10;
+        // ro vars
+        static volatile unsigned fps = 0;
+        // private vars
+        static volatile unsigned timer_counter = 0, loop_counter = 0;
+        // private threaded timer
+        static struct install {
+            install() {
+                std::thread([&]{
+                    std::chrono::microseconds acc( 0 ), third( 300000 );
+                    while( isGameRunning ) {
+                        // update timer
+                        timer_counter++;
+                        std::chrono::microseconds duration( int(1000000/hz) );
+                        std::this_thread::sleep_for( duration );
+                        // update fps 3 times per second
+                        acc += duration;
+                        if( acc >= third ) {
+                            acc -= acc;
+                            static int before = loop_counter;
+                            fps = int( round( (loop_counter - before) * 3.3333333 ) );
+                            before = loop_counter;
+                        }
+                    }
+                    isGameRunning = 1;
+                }).detach();
+            }
+            ~install() {
+                for( hz = 10000, isGameRunning = 0; !isGameRunning ; );
+            }
+        } timer;
+
+        hz = HZ > 0 ? HZ : hz;
+        if(FPS) *FPS = fps;
+
+        // we got too far ahead, cpu idle wait
+        while( loop_counter > timer_counter && isGameRunning ) {
+            std::this_thread::yield();
+        }
+
+        // max auto frameskip is 10, ie, even if speed is low paint at least one frame every 10
+        if( timer_counter > loop_counter + 10 ) {
+            timer_counter = loop_counter;
+        }
+
+        loop_counter++;
+
+        // only draw if we are fast enough, otherwise skip the frame
+        return( loop_counter >= timer_counter );
+    }
+}
+
+namespace sand {
+    unsigned fps_ = 0;
+    unsigned get_fps() {
+        return fps_;
+    }
+    bool lock( unsigned HZ ) {
+        return lock_impl( HZ, &fps_ );
+    }
+}

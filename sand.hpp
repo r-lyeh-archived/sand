@@ -1,3 +1,44 @@
+/* Sand is a lightweight and simple time framework written in C++11.
+ * Sand supports Unix stamps, hires timers, calendars, locales and tweening.
+ * Copyright (c) 2010-2014 Mario 'rlyeh' Rodriguez
+
+ * Based on code by Robert Penner, GapJumper, Terry Schubring, Jesus Gollonet,
+ * Tomas Cepeda, John Resig. Thanks guys! :-)
+ *
+ * Simple fps framerate locker. based on code by /u/concavator (ref: http://goo.gl/Ry50A4)
+
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+
+ * issues:
+ * - if year < 1900, sand::rtc() behavior is undefined
+
+ * to do:
+ * - grain -> struct grain { std::uint64_t seconds, fract; };
+ * - looper/rtc -> serialize factor as well (and held?)
+ * - move factor/shift and pause/resume to dt
+ * - kiloseconds, ks | ref: http://bavardage.github.com/Kiloseconds/
+ * - something like http://momentjs.com/ for pretty printing
+ * - also, https://code.google.com/p/datejs/
+
+ * - rlyeh ~~ listening to The Mission / Butterfly on a wheel
+ */
+
 #pragma once
 
 #include <cstdint>
@@ -64,6 +105,7 @@ namespace sand
     std::string in( double t );
 
     // format
+    // locale = "es-ES", "Chinese_China.936", "en_US.UTF8", etc...
     std::string format( double timestamp, const std::string &format, const std::string &locale = std::string() );
     std::string locale( double timestamp, const std::string &locale, const std::string &format = std::string() );
 
@@ -103,31 +145,12 @@ namespace sand
     };
 
     //
-    // double tick(__FILE__, __LINE__);
-    // bool wait( double hz = 60.0 );
+    // function that locks your logic to desired framerate (like 60 HZ).
+    // returns true if you should render your game after logic update; else update logic only.
+    bool lock( unsigned HZ );
+    // returns number of lapsed fps
+    unsigned get_fps();
 
-    class fps
-    {
-        public:
-
-        fps();
-
-        bool tick();
-        void wait( double frames_per_second = 60.0 );
-
-        std::deque< float > get_history() const;
-
-        std::string str() const;
-        size_t get() const;
-
-        protected:
-
-        sand::dt dt, frame_limiter, frame_timer;
-        size_t frames, frames_per_second;
-        std::string format;
-
-        std::deque< float > history;
-    };
 
     // once(); !!
     // usage:
