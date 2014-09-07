@@ -131,16 +131,16 @@ namespace sand
         }
 
         double s() {
-            return ( sand::now() - start ) * 1.0;
+            return to_seconds( sand::now() - start );
         }
         double ms() {
-            return ( sand::now() - start ) * 1000.0;
+            return to_milliseconds( sand::now() - start );
         }
         double us() {
-            return ( sand::now() - start ) * 1000000.0;
+            return to_microseconds( sand::now() - start );
         }
         double ns() {
-            return ( sand::now() - start ) * 1000000000.0;
+            return to_nanoseconds( sand::now() - start );
         }
     };
 
