@@ -937,7 +937,7 @@ namespace sand
 
 
 // simple fps framerate locker. based on code by /u/concavator (ref: http://goo.gl/Ry50A4)
-// - rlyeh. mit licensed
+// - rlyeh. BOOST licensed
 
 #include <chrono>
 #include <thread>

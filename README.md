@@ -6,7 +6,7 @@ sand
 - Sand is tiny. One header and one source file.
 - Sand is cross-platform. Builds on Windows/Linux/MacosX. Compiles on g++/clang/msvc.
 - Sand is stand-alone. OS dependencies only. No third party dependencies.
-- Sand is MIT licensed.
+- Sand is BOOST licensed.
 
 sync api
 --------
