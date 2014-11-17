@@ -319,6 +319,13 @@ namespace sand
         kSandTimerSleep( seconds );
         return;
 
+        /*
+        sand::dt dt;
+        while( dt.s() < secs ) {
+            sand::wink();
+        }
+        */
+
         std::chrono::microseconds duration( (int)(seconds * 1000000) );
         std::this_thread::sleep_for( duration );
     }
