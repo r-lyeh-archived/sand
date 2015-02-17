@@ -1,4 +1,4 @@
-sand
+sand <a href="https://travis-ci.org/r-lyeh/sand"><img src="https://api.travis-ci.org/r-lyeh/sand.svg?branch=master" align="right" /></a>
 ====
 
 - Sand is a lightweight and simple time library written in C++11.

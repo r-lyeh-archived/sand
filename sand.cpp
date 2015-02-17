@@ -86,7 +86,7 @@
 #define $yes(...) __VA_ARGS__
 #define $no(...)
 
-#if defined(__GNUC__) && (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__ <= 40801 )
+#if defined(__GNUC__) && (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__ <= 40902 )
     namespace std
     {
         static std::string put_time( const std::tm* tmb, const char* fmt ) {
@@ -222,7 +222,7 @@ namespace sand
         offset += t;
     }
 
-    std::string locale( double timestamp_secs, const std::string &locale_, const std::string &format ) { // taken from sole::printftime 
+    std::string locale( double timestamp_secs, const std::string &locale_, const std::string &format ) { // taken from sole::printftime
         std::string timef;
         try {
             std::time_t t = uint64_t( timestamp_secs );
