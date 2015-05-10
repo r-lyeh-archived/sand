@@ -1,4 +1,4 @@
-/* Sand is a lightweight and simple time framework written in C++11. BOOST licensed.
+/* Sand is a lightweight and simple time framework written in C++11. zlib/libpng licensed.
  * Sand supports Unix stamps, hires timers, calendars and locales.
  * Copyright (c) 2010-2014 Mario 'rlyeh' Rodriguez
 
@@ -470,83 +470,3 @@ namespace sand
 #undef $melse
 #undef $msc
 
-
-
-
-// simple fps framerate locker. based on code by /u/concavator (ref: http://goo.gl/Ry50A4)
-// - rlyeh. BOOST licensed
-
-#include <chrono>
-#include <thread>
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <algorithm>
-
-namespace {
-    // function that locks your logic to desired framerate (in HZ).
-    // if optional FPS arg is provided, function fills it up with number of frames per second.
-    // returns true if you should render your game after logic update; else update logic only.
-    bool lock_impl( unsigned HZ, unsigned *FPS ) {
-        // rw vars
-        static volatile unsigned hz = 60, isGameRunning = 1, maxframeskip = 10;
-        // ro vars
-        static volatile unsigned fps = 0;
-        // private vars
-        static volatile unsigned timer_counter = 0, loop_counter = 0;
-        // private threaded timer
-        static struct install {
-            install() {
-                std::thread([&]{
-                    std::chrono::microseconds acc( 0 ), third( 300000 );
-                    while( isGameRunning ) {
-                        // update timer
-                        timer_counter++;
-                        std::chrono::microseconds duration( int(1000000/hz) );
-                        std::this_thread::sleep_for( duration );
-                        // update fps 3 times per second
-                        acc += duration;
-                        if( acc >= third ) {
-                            acc -= acc;
-                            static int before = loop_counter;
-                            fps = int( round( (loop_counter - before) * 3.3333333 ) );
-                            before = loop_counter;
-                        }
-                    }
-                    isGameRunning = 1;
-                }).detach();
-            }
-            ~install() {
-                for( hz = 10000, isGameRunning = 0; !isGameRunning ; );
-            }
-        } timer;
-
-        hz = HZ > 0 ? HZ : hz;
-        if(FPS) *FPS = fps;
-
-        // we got too far ahead, cpu idle wait
-        while( loop_counter > timer_counter && isGameRunning ) {
-            std::this_thread::yield();
-        }
-
-        // max auto frameskip is 10, ie, even if speed is low paint at least one frame every 10
-        if( timer_counter > loop_counter + 10 ) {
-            timer_counter = loop_counter;
-        }
-
-        loop_counter++;
-
-        // only draw if we are fast enough, otherwise skip the frame
-        return( loop_counter >= timer_counter );
-    }
-}
-
-namespace sand {
-    unsigned fps_ = 0;
-    unsigned get_fps() {
-        return fps_;
-    }
-    bool lock( unsigned HZ ) {
-        return lock_impl( HZ, &fps_ );
-    }
-}

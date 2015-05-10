@@ -1,4 +1,4 @@
-/* Sand is a lightweight and simple time framework written in C++11. BOOST licensed.
+/* Sand is a lightweight and simple time framework written in C++11. zlib/libpng licensed.
  * Sand supports Unix stamps, hires timers, calendars and locales.
  * Copyright (c) 2010-2014 Mario 'rlyeh' Rodriguez
 
@@ -26,6 +26,9 @@
 
 #include <deque>
 #include <string>
+
+#define SAND_VERSION "0.1.0" /* (2015/09/19) Moved framerate locker to a library apart
+#define SAND_VERSION "0.0.0" // (2010/xx/xx) Initial version */
 
 namespace sand
 {
@@ -123,14 +126,6 @@ namespace sand
             return to_nanoseconds( sand::now() - start );
         }
     };
-
-    //
-    // function that locks your logic to desired framerate (like 60 HZ).
-    // returns true if you should render your game after logic update; else update logic only.
-    bool lock( unsigned HZ );
-    // returns number of lapsed fps
-    unsigned get_fps();
-
 
     // once(); !!
     // usage:
