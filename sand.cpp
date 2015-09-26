@@ -1,22 +1,5 @@
-/* Sand is a lightweight and simple time framework written in C++11. zlib/libpng licensed.
- * Sand supports Unix stamps, hires timers, calendars and locales.
- * Copyright (c) 2010-2014 Mario 'rlyeh' Rodriguez
-
- * Simple fps framerate locker. based on code by /u/concavator (ref: http://goo.gl/Ry50A4)
-
- * issues:
- * - if year < 1900, sand::rtc() behavior is undefined
-
- * to do:
- * - grain -> struct grain { std::uint64_t seconds, fract; };
- * - looper/rtc -> serialize factor as well (and held?)
- * - move factor/shift and pause/resume to dt
- * - kiloseconds, ks | ref: http://bavardage.github.com/Kiloseconds/
- * - something like http://momentjs.com/ for pretty printing
- * - also, https://code.google.com/p/datejs/
-
- * - rlyeh ~~ listening to The Mission / Butterfly on a wheel
- */
+// Sand, a functional time controller (C++11). ZLIB/LibPNG licensed.
+// - rlyeh ~~ listening to The Mission / Butterfly on a wheel
 
 #include <cassert>
 #include <cmath>
@@ -33,70 +16,15 @@
 
 #include "sand.hpp"
 
-#if defined(_WIN32)
-#   include <Windows.h>
-#   define kSandTimerHandle                      LARGE_INTEGER
-#   define kSandTimerFreq( handle )              { kSandTimerHandle fhandle; DWORD_PTR oldmask = ::SetThreadAffinityMask(::GetCurrentThread(), 0); ::QueryPerformanceFrequency( &fhandle ); ::SetThreadAffinityMask(::GetCurrentThread(), oldmask); frequency = 1000000.0 / double(fhandle.QuadPart); }
-#   define kSandTimerUpdate( handle )            {                           DWORD_PTR oldmask = ::SetThreadAffinityMask(::GetCurrentThread(), 0); ::QueryPerformanceCounter  ( &handle ); ::SetThreadAffinityMask(::GetCurrentThread(), oldmask); }
-#   define kSandTimerSetCounter( handle, value ) handle.QuadPart = value
-#   define kSandTimerDiffCounter( handle1, handle2 ) ( ( handle2.QuadPart - handle1.QuadPart ) * frequency )
-#   define kSandTimerSleep( seconds_f )          Sleep( (int)(seconds_f * 1000) )
-#   define kSandTimerWink( units_t )             Sleep( units_t )
-#else
-#   include <sys/time.h>
-#   include <unistd.h>
-//  hmmm... check clock_getres() as seen in http://tdistler.com/2010/06/27/high-performance-timing-on-linux-windows#more-350
-//  frequency int clock_getres(clockid_t clock_id, struct timespec *res);
-//  clock     int clock_gettime(clockid_t clock_id, struct timespec *tp);
-//  nanosleep() instead?
-#   define kSandTimerHandle                      timeval
-#   define kSandTimerFreq( handle )
-#   define kSandTimerUpdate( handle )            gettimeofday( &handle, NULL )
-#   define kSandTimerSetCounter( handle, value ) do { handle.tv_sec = 0; handle.tv_usec = value; } while (0)
-#   define kSandTimerDiffCounter( handle1, handle2 ) ( (handle2.tv_sec * 1000000.0) + handle2.tv_usec ) - ( (handle1.tv_sec * 1000000.0) + handle1.tv_usec )
-#   define kSandTimerSleep( seconds_f )          usleep( seconds_f * 1000000.f )
-#   define kSandTimerWink( units_t )             usleep( units_t )
-//  do { float fractpart, intpart; fractpart = std::modf( seconds_f, &intpart); \
-//    ::sleep( int(intpart) ); usleep( int(fractpart * 1000000) ); } while( 0 )
+#include <thread>
+#include <chrono>
+#if !defined(SAND_USE_OMP) && ( defined(USE_OMP) || defined(_MSC_VER) /*|| defined(__ANDROID_API__)*/ )
+#   define SAND_USE_OMP
+#   include <omp.h>
 #endif
 
-#ifdef SAND_USE_OMP_TIMERS
-// todo: test this
-#include <omp.h>
-#undef  kSandTimerHandle
-#define kSandTimerHandle                            double
-#undef  kSandTimerFreq
-#define kSandTimerFreq( handle )
-#undef  kSandTimerUpdate
-#define kSandTimerUpdate( handle )                  { handle = omp_get_wtime(); }
-#undef  kSandTimerSetCounter
-#define kSandTimerSetCounter( handle, value )       ( handle = value / 1000000.0 )
-#undef  kSandTimerDiffCounter
-#define kSandTimerDiffCounter( handle1, handle2 )   ( handle2 - handle1 )
-#endif
-
-#ifdef  _MSC_VER
-#define $msc   $yes
-#define $melse $no
-#else
-#define $msc   $no
-#define $melse $yes
-#endif
-
-#define $yes(...) __VA_ARGS__
-#define $no(...)
-
-#if defined(__GNUC__) && (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__ <= 40902 )
-    namespace std
-    {
-        static std::string put_time( const std::tm* tmb, const char* fmt ) {
-            std::string s( 128, '\0' );
-            while( !strftime( &s[0], s.size(), fmt, tmb ) )
-                s.resize( s.size() + 128 );
-            return s;
-        }
-    }
-#endif
+#pragma warning(push)
+#pragma warning(disable: 4996) // gmtime, localtime
 
 /////////////////////////////////////////////////////////////////////////////
 
@@ -104,11 +32,21 @@ namespace sand
 {
 namespace
 {
-    int floor( double f ) {
-        return int( ::floor(f) );
+    int64_t clock() {
+#   ifdef SAND_USE_OMP
+        static auto const epoch = omp_get_wtime(); 
+        return (int64_t)(( omp_get_wtime() - epoch ) * 1000);
+#   else
+        static auto const epoch = std::chrono::steady_clock::now(); // milli ms > micro us > nano ns
+        return (int64_t)std::chrono::duration_cast< std::chrono::milliseconds >( std::chrono::steady_clock::now() - epoch ).count();
+#   endif
     }
-    int ceil( double f ) {
-        return int( ::ceil(f) );
+
+    std::string floor( double f ) {
+        return std::to_string( int( ::floor(f) ) );
+    }
+    std::string ceil( double f ) {
+        return std::to_string( int( ::ceil(f) ) );
     }
     class custom : public std::string
     {
@@ -145,328 +83,348 @@ namespace
         }
     };
 
-    namespace legacy
-    {
-        auto epoch = [](){
-            return std::chrono::system_clock::to_time_t( std::chrono::system_clock::now() );
-        };
-
-        class dt
-        {
-            public:
-
-            dt()
-            {
-                reset();
-            }
-
-            double s() //const
-            {
-                return us() / 1000000.0;
-            }
-
-            double ms() //const
-            {
-                return us() / 1000.0;
-            }
-
-            double us() //const
-            {
-                kSandTimerUpdate( endCount );
-
-                return kSandTimerDiffCounter( startCount, endCount );
-            }
-
-            double ns() //const
-            {
-                return us() * 1000.0;
-            }
-
-            void reset()
-            {
-                kSandTimerFreq( frequency ); //to dt2() ctor ?
-
-                kSandTimerSetCounter( startCount, 0 );
-                kSandTimerSetCounter( endCount, 0 );
-
-                kSandTimerUpdate( startCount );
-            }
-
-            protected:
-
-            kSandTimerHandle startCount, endCount;
-            double frequency;
-        };
-    }
-}
+    int64_t offset = 0;
 }
 
-namespace sand
-{
-    namespace
-    {
-        double offset = 0;
-        legacy::dt local;
+    int64_t gmt() {
+        time_t t = std::time(0);
+        struct tm *gtm = std::gmtime(&t);
+        int hour1 = gtm->tm_hour;
+        struct tm *ltm = std::localtime(&t);
+        int hour2 = ltm->tm_hour;
+        return hours(hour2 - hour1);
     }
 
-    double now() {
-        static const double app_epoch = double( std::time(NULL) );
-        return offset + local.s() + app_epoch;
+    int64_t utc() {
+        static const int64_t app_epoch = seconds(std::time(NULL));
+        return offset + app_epoch + sand::clock();
     }
 
-    double uptime() {
-        return offset + local.s();
+    int64_t now() {
+        static const int64_t gmt_epoch = gmt();
+        return utc() + gmt_epoch;
     }
 
-    void lapse( double t ) {
-        offset += t;
+    int64_t uptime() {
+        return offset + sand::clock();
     }
 
-    std::string locale( double timestamp_secs, const std::string &locale_, const std::string &format ) { // taken from sole::printftime
-        std::string timef;
-        try {
-            std::time_t t = uint64_t( timestamp_secs );
-            std::tm tm;
-            $msc(
-                localtime_s( &tm, &t );
-            )
-            $melse(
-                localtime_r( &t, &tm );
-            )
+    void shift( int64_t t ) {
+        offset += seconds(t);
+    }
 
-            std::stringstream ss;
+    struct timestamp_t {
+        int millis; // 0-999
+        int second; // 0-59
+        int minute; // 0-59
+        int hour;   // 0-23
+        int day;    // 0-30
+        int month;  // 0-11
+        int year;   // 0-xx (representing 1900-2xxx)
+    };
+    enum : int {
+        RTC_EPOCH_JULIAN_DAY = 2440588, // January 1st, 1970
+    };
 
-            std::locale lc( locale_.c_str() );
-            ss.imbue( lc );
-            ss << std::put_time( &tm, format.empty() ? "%c" : format.c_str() );
+    timestamp_t epoch_to_timestamp( int64_t epoch ) {
+        int64_t year, month, day, l, n;
 
-            timef = ss.str();
+        timestamp_t dt;
+        dt.millis = epoch % 1000;
+        epoch /= 1000;
+
+        // Reference: Fliegel, H. F. and van Flandern, T. C. (1968).
+        // Communications of the ACM, Vol. 11, No. 10 (October, 1968).
+        l = epoch / 86400 + 68569 + RTC_EPOCH_JULIAN_DAY;
+        n = 4 * l / 146097;
+        l = l - (146097 * n + 3) / 4;
+        year = 4000 * (l + 1) / 1461001;
+        l = l - 1461 * year / 4 + 31;
+        month = 80 * l / 2447;
+        day = l - 2447 * month / 80;
+        l = month / 11;
+        month = month + 2 - 12 * l;
+        year = 100 * (n - 49) + year + l;
+
+        dt.day = (int)day - 1;
+        dt.month = (int)month - 1;
+        dt.year = (int)year - 1900;
+
+        epoch = epoch % (24 * 3600);
+        dt.hour = (int)epoch / 3600;
+
+        epoch = epoch % 3600;
+        dt.minute = (int)epoch / 60;
+        dt.second = (int)epoch % 60;
+        return dt;
+    }
+
+    int64_t date( int year, int month, int day ) {
+        // Reference: Fliegel, H. F. and van Flandern, T. C. (1968).
+        // Communications of the ACM, Vol. 11, No. 10 (October, 1968).
+        return days( day - 32075 - RTC_EPOCH_JULIAN_DAY
+            + 1461 * (year + 4800 + (month - 14) / 12) / 4
+            + 367 * (month - 2 - 12 * ((month - 14) / 12)) / 12
+            - 3 * ((year + 4900 + (month - 14) / 12) / 100) / 4 );
+    }
+
+    int64_t time( int hour, int minute, int second, int millis ) {
+        return hours(hour) + minutes(minute) + seconds(second) + milliseconds(millis);
+    }
+
+    int64_t datetime( int year, int month, int day, int hour, int minute, int second, int millis ) {
+        return date( year, month, day ) + time( hour, minute, second, millis );
+    }
+
+    namespace {
+        // this function may look lame, but iostream is a hell and sprintf has portability issues
+        // also, we only cover what we really need.
+        std::string itoa(int x, int zerodigits = 0) {
+            if( zerodigits == 4 ) {
+            if( x >= 1000 ) return         std::to_string(x);
+            if( x >=  100 ) return   "0" + std::to_string(x);
+            if( x >=   10 ) return  "00" + std::to_string(x);
+                            return "000" + std::to_string(x);
+            }
+            if( zerodigits == 3 ) {
+            if( x >= 100 ) return        std::to_string(x);
+            if( x >=  10 ) return  "0" + std::to_string(x);
+                           return "00" + std::to_string(x);
+            }
+            if( zerodigits == 2 ) {
+            if( x >=  10 ) return        std::to_string(x);
+                           return  "0" + std::to_string(x);
+            }
+            return std::to_string(x);
         }
-        catch(...) {
-            timef = "";
+        std::string replace( std::string self, const std::string &target, const std::string &replacement ) {
+            size_t found = 0;
+            while( ( found = self.find( target, found ) ) != std::string::npos ) {
+                self.replace( found, target.length(), replacement );
+                found += replacement.length();
+            }
+            return self;
         }
+    }
+
+    std::string format( int64_t timestamp, const std::string &format ) {
+        timestamp_t dt = epoch_to_timestamp( timestamp );
+
+        const char *mo[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
+        "Aug", "Sep", "Oct", "Nov", "Dec" };
+        const char *MO[] = { "January", "February", "March", "April", "May", "June", "July",
+        "August", "September", "October", "November", "December" };
+
+        std::string timef = format;
+        timef = replace(timef, "MS", itoa((int)dt.millis, 3));
+        timef = replace(timef, "SS", itoa((int)dt.second, 2));
+        timef = replace(timef, "MM", itoa((int)dt.minute, 2));
+        timef = replace(timef, "HH", itoa((int)dt.hour, 2));
+        timef = replace(timef, "yyyy", itoa((int)dt.year + 1900, 4));
+        timef = replace(timef, "yy", itoa((int)dt.year / 100, 2));
+        timef = replace(timef, "mmmm", "\1");
+        timef = replace(timef, "mmm", "\2");
+        timef = replace(timef, "mm", "\3");
+        timef = replace(timef, "m", "\4");
+        timef = replace(timef, "dd", "\5");
+        timef = replace(timef, "d", "\6");
+        timef = replace(timef, "\1", MO[dt.month]);
+        timef = replace(timef, "\2", mo[dt.month]);
+        timef = replace(timef, "\3", itoa((int)dt.month + 1, 2));
+        timef = replace(timef, "\4", itoa((int)dt.month + 1, 1));
+        timef = replace(timef, "\5", itoa((int)dt.day + 1, 2));
+        timef = replace(timef, "\6", itoa((int)dt.day + 1, 1));
+
+        /*
+        %c - full datetime
+        %x - full date
+        %X - full time
+
+        %Y - year YYYY (range 1900 to xxxx)
+        %y - year YY (range 00 to 99)
+        %C - The century number (year/100) as a 2-digit integer. (SU)
+
+        %B - full month name 
+        %b - short month name 
+        %m - month MM (range 01 to 12)
+
+        %A - full weekday name
+        %a - short weekday name
+        %d - day of the month DD (range 01 to 31).
+        %e - day of the month D no leading zero. (range 1 to 31)
+        %j - day of the year DDD (range 001 to 366).
+
+        %V - The ISO 8601 week number (see NOTES) of the current year as a decimal number, range 01 to 53, where week 1 is the first week that has at least 4 days in the new year. See also %U and %W. (SU)
+
+        %F - The date in %Y-%m-%d (the ISO 8601 date format). (C99)
+        %r - The time in a.m. or p.m. notation %I:%M:%S %p. (SU)
+        %R - The time in 24-hour notation (%H:%M). (SU)
+        %T - The time in 24-hour notation (%H:%M:%S). (SU)
+
+        %H - hour as a decimal number using a 24-hour clock (range 00 to 23).
+        %H - hour as a decimal number using a 24-hour clock (range 0 to 23); no leading zero (TZ)
+        %I - hour as a decimal number using a 12-hour clock (range 01 to 12).
+        %I - hour as a decimal number using a 12-hour clock (range 1 to 12); no leading zero (TZ)
+
+        %M - minute as a decimal number (range 00 to 59).
+
+        %S - second as a decimal number (range 00 to 60). (The range is up to 60 to allow for occasional leap seconds.)
+        %s - number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC). (TZ)
+
+        %P - Either "AM" or "PM" according to the given time value, or the corresponding strings for the current locale. Noon is treated as "PM" and midnight as "AM".
+        %p - Either "am" or "pm" according to the given time value, or the corresponding strings for the current locale. Noon is treated as "pm" and midnight as "am".
+
+        %z - The +hhmm or -hhmm numeric timezone (that is, the hour and minute offset from UTC). (SU)
+        %Z - The timezone or name or abbreviation.
+        */
+
         return timef;
     }
 
-    std::string format( double t, const std::string &format_, const std::string &locale_ )
-    {
-#if 0
-        char pBuffer[80];
+    // serialization
 
-        struct tm * timeinfo;
-        time_t stored = (time_t)( t );
-        timeinfo = localtime ( &stored );
-        strftime(pBuffer, 80, format_.c_str(), timeinfo);
-
-        return pBuffer;
-#else
-        return locale( t, locale_, format_ );
-#endif
+    std::string str( int64_t t ) {
+        return format( t, "yyyy-mm-dd HH:MM:SS.MS" );
     }
 
-
-    double str( const std::string &timestamp_YMDhms ) {
-        std::deque< custom > token = custom( timestamp_YMDhms ).tokenize(":-/ "); //:)
+    int64_t str( const std::string &ymdhmsm ) {
+        std::deque< custom > token = custom( ymdhmsm ).tokenize(" :/.TZ+-");
 
         if( token.size() < 6 )
             return 0;
 
-        struct tm timeinfo;
+        int year   = token[0].as<int>();
+        int month  = token[1].as<int>();
+        int day    = token[2].as<int>();
+        int hour   = token[3].as<int>();
+        int minute = token[4].as<int>();
+        int second = token[5].as<int>();
+        int millis = token.size() <= 6 ? 0 : token[6].as<int>();
+        // timezone
 
-        //months are in [0..] range where days, hours, mins and secs use [1..] (doh!)
-        timeinfo.tm_year  = token[0].as<int>() - 1900;
-        timeinfo.tm_mon   = token[1].as<int>() - 1;
-        timeinfo.tm_mday  = token[2].as<int>();
-        timeinfo.tm_hour  = token[3].as<int>();
-        timeinfo.tm_min   = token[4].as<int>();
-        timeinfo.tm_sec   = token[5].as<int>();
-        //-1 = do not adjust daylight savings
-        timeinfo.tm_isdst = -1;
-
-        return double( mktime( &timeinfo ) );
+        return date( year, month, day ) + time( hour, minute, second, millis );
     }
 
-    std::string str( double t ) {
-        return format( t, "%Y-%m-%d %H:%M:%S" );
-    }
-
-    void wink() {
-        kSandTimerWink( 1 );
-    }
-
-    void sleep( double seconds ) {
-        kSandTimerSleep( seconds );
-        return;
-
-        /*
-        sand::dt dt;
-        while( dt.s() < secs ) {
-            sand::wink();
-        }
-        */
-
-        std::chrono::microseconds duration( (int)(seconds * 1000000) );
+    void sleep( int64_t millisecs ) {
+        std::chrono::milliseconds duration( (int)(millisecs) );
         std::this_thread::sleep_for( duration );
     }
 
-    double nanoseconds( double t ) {
-        return t / 1000000000.0;
+    int64_t nanoseconds( int64_t t ) {
+        return t / 1000000;
     }
-    double microseconds( double t ) {
-        return t / 1000000.0;
+    int64_t microseconds( int64_t t ) {
+        return t / 1000;
     }
-    double milliseconds( double t ) {
-        return t / 1000.0;
-    }
-    double seconds( double t ) {
+    int64_t milliseconds( int64_t t ) {
         return t;
     }
-    double minutes( double t ) {
+    int64_t seconds( int64_t t ) {
+        return t * 1000;
+    }
+    int64_t minutes( int64_t t ) {
         return t * seconds(60);
     }
-    double hours( double t ) {
+    int64_t hours( int64_t t ) {
         return t * minutes(60);
     }
-    double days( double t ) {
+    int64_t days( int64_t t ) {
         return t * hours(24);
     }
-    double weeks( double t ) {
+    int64_t weeks( int64_t t ) {
         return t * days(7);
     }
-    double months( double t ) {
-        return t * ( weeks(t) / 4 );
-    }
-    double years( double t ) {
-        return t * days(365.242190402); // + days(n/4);
-    }
 
-    double calendar( const std::string &YMDhms ) {
-        return str( YMDhms );
+    int64_t as_nanoseconds( int64_t t ) {
+        return t * 1000000;
     }
-
-    double to_nanoseconds( double t ) {
-        return t * 1000000000.0;
+    int64_t as_microseconds( int64_t t ) {
+        return t * 1000;
     }
-    double to_microseconds( double t ) {
-        return t * 1000000.0;
-    }
-    double to_milliseconds( double t ) {
-        return t * 1000.0;
-    }
-    double to_seconds( double t ) {
+    int64_t as_milliseconds( int64_t t ) {
         return t;
     }
-    double to_minutes( double t ) {
+    int64_t as_seconds( int64_t t ) {
+        return t / 1000;
+    }
+    int64_t as_minutes( int64_t t ) {
         return t / seconds(60);
     }
-    double to_hours( double t ) {
+    int64_t as_hours( int64_t t ) {
         return t / minutes(60);
     }
-    double to_days( double t ) {
+    int64_t as_days( int64_t t ) {
         return t / hours(24);
     }
-    double to_weeks( double t ) {
+    int64_t as_weeks( int64_t t ) {
         return t / days(7);
     }
-    double to_months( double t ) {
-        return t / ( to_weeks(t) / 4 );
+
+    int year( int64_t t ) {
+        return custom( format( t, "yyyy" ) ).as<int>();
     }
-    double to_years( double t ) {
-        return t / days(365.242190402); // + days(n/4);
+    int month( int64_t t ) {
+        return custom( format( t, "m" ) ).as<int>();
+    }
+    int day( int64_t t ) {
+        return custom( format( t, "d" ) ).as<int>();
+    }
+    int hour( int64_t t ) {
+        return custom( format( t, "HH" ) ).as<int>();
+    }
+    int minute( int64_t t ) {
+        return custom( format( t, "MM" ) ).as<int>();
+    }
+    int second( int64_t t ) {
+        return custom( format( t, "SS" ) ).as<int>();
+    }
+    int millisecond( int64_t t ) {
+        return custom( format( t, "MS" ) ).as<int>();
     }
 
-    int year( double t ) {
-        return custom( format(t, "%Y") ).as<int>();
-    }
-    int month( double t ) {
-        return custom( format(t, "%m") ).as<int>();
-    }
-    int day( double t ) {
-        return custom( format(t, "%d") ).as<int>();
-    }
+    // pretty (deictic) human time
+    std::string pretty( int64_t reltime_ms ) {
+        // based on code by John Resig (jquery.com)
+        int abs_diff = (int)std::abs(reltime_ms / 1000);
+        int day_diff = (int)std::floor(abs_diff / 86400);
 
-    int hour( double t ) {
-        return custom( format(t, "%H") ).as<int>();
-    }
-    int minute( double t ) {
-        return custom( format(t, "%M") ).as<int>();
-    }
-    int second( double t ) {
-        return custom( format(t, "%S") ).as<int>();
+        if( reltime_ms < 0 ) {
+            if( day_diff == 0 ) {
+                if( abs_diff <=   0 ) return "right now";
+                if( abs_diff <=   1 ) return "a second ago";
+                if( abs_diff <   60 ) return sand::floor(abs_diff) + " seconds ago";
+                if( abs_diff <  120 ) return "a minute ago";
+                if( abs_diff < 3600 ) return sand::floor(abs_diff/60) + " minutes ago";
+                if( abs_diff < 7200 ) return "an hour ago";
+                return sand::floor(abs_diff/3600) + " hours ago";
+            }
+            if( day_diff ==  1 ) return "yesterday";
+            if( day_diff <= 13 ) return std::to_string(day_diff) + " days ago";
+            if( day_diff  < 31 ) return sand::ceil(day_diff/7) + " weeks ago";
+            if( day_diff  < 62 ) return "a month ago";
+            if( day_diff < 365 ) return sand::ceil(day_diff/31) + " months ago";
+            if( day_diff < 730 ) return "a year ago";
+            return sand::ceil(day_diff/365) + " years ago";
+        } else {
+            if( day_diff == 0 ) {
+                if( abs_diff <=   0 ) return "right now";
+                if( abs_diff <=   1 ) return "a second from now";
+                if( abs_diff <   60 ) return sand::floor(abs_diff) + " seconds from now";
+                if( abs_diff <  120 ) return "a minute from now";
+                if( abs_diff < 3600 ) return sand::floor(abs_diff/60) + " minutes from now";
+                if( abs_diff < 7200 ) return "an hour from now";
+                return sand::floor(abs_diff/3600) + " hours from now";
+            }
+            if( day_diff ==  1 ) return "tomorrow";
+            if( day_diff <= 13 ) return std::to_string(day_diff) + " days from now";
+            if( day_diff  < 31 ) return sand::ceil(day_diff/7) + " weeks from now";
+            if( day_diff  < 62 ) return "a month from now";
+            if( day_diff < 365 ) return sand::ceil(day_diff/31) + " months from now";
+            if( day_diff < 730 ) return "a year from now";
+            return sand::ceil(day_diff/365) + " years from now";
+        }
     }
 }
 
-
-namespace sand
-{
-    std::string ago( double diff_seconds ) {
-        // based on code by John Resig (jquery.com)
-        int abs_diff = int(std::abs(diff_seconds));
-        int day_diff = sand::floor(abs_diff / 86400);
-
-        if( day_diff == 0 ) {
-            if( abs_diff <   60 ) return "just now";
-            if( abs_diff <  120 ) return "a minute ago";
-            if( abs_diff < 3600 ) return std::to_string(sand::floor(abs_diff/60)) + " minutes ago";
-            if( abs_diff < 7200 ) return "an hour ago";
-            return std::to_string( sand::floor(abs_diff/3600) ) + " hours ago";
-        }
-        if( day_diff ==  1 ) return "yesterday";
-        if( day_diff <= 13 ) return std::to_string(day_diff) + " days ago";
-        if( day_diff  < 31 ) return std::to_string(sand::ceil(day_diff/7)) + " weeks ago";
-        if( day_diff  < 62 ) return "a month ago";
-        if( day_diff < 365 ) return std::to_string(sand::ceil(day_diff/31)) + " months ago";
-        if( day_diff < 730 ) return "a year ago";
-        return std::to_string(sand::ceil(day_diff/365)) + " years ago";
-    }
-
-    std::string in( double diff_seconds ) {
-        // based on code by John Resig (jquery.com)
-        int abs_diff = int(std::abs(diff_seconds));
-        int day_diff = sand::floor(abs_diff / 86400);
-
-        if( day_diff == 0 ) {
-            if( abs_diff <   60 ) return "right now";
-            if( abs_diff <  120 ) return "in a minute";
-            if( abs_diff < 3600 ) return std::string("in ") + std::to_string(sand::floor(abs_diff/60)) + " minutes";
-            if( abs_diff < 7200 ) return "in an hour";
-            return std::string("in ") + std::to_string( sand::floor(abs_diff/3600) ) + " hours ago";
-        }
-        if( day_diff ==  1 ) return "tomorrow";
-        if( day_diff <= 13 ) return std::string("in ") + std::to_string(day_diff) + " days";
-        if( day_diff  < 31 ) return std::string("in ") + std::to_string(sand::ceil(day_diff/7)) + " weeks";
-        if( day_diff  < 62 ) return "in a month";
-        if( day_diff < 365 ) return std::string("in ") + std::to_string(sand::ceil(day_diff/31)) + " months";
-        if( day_diff < 730 ) return "in a year";
-        return std::string("in ") + std::to_string(sand::ceil(day_diff/365)) + " years";
-    }
-
-    std::string pretty( double diff_seconds ) {
-        return diff_seconds < 0 ? ago(diff_seconds) : in(diff_seconds);
-    }
-
-    std::string diff( double since, double then ) {
-        double diff_seconds = abs(then) - abs(since);
-        return pretty( diff_seconds );
-    }
-
-    std::string diff( double then ) {
-        return diff( then, now() );
-    }
-}
-
-#undef kSandTimerWink
-#undef kSandTimerHandle
-#undef kSandTimerFreq
-#undef kSandTimerUpdate
-#undef kSandTimerDiffCounter
-#undef kSandTimerSetCounter
-#undef kSandTimerGetCounter
-#undef kSandTimerSleep
-#undef kSandTimerWink
-
-#undef $yes
-#undef $no
-#undef $melse
-#undef $msc
+#pragma warning(pop)
 

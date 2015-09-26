@@ -1,150 +1,129 @@
-/* Sand is a lightweight and simple time framework written in C++11. zlib/libpng licensed.
- * Sand supports Unix stamps, hires timers, calendars and locales.
- * Copyright (c) 2010-2014 Mario 'rlyeh' Rodriguez
+// Sand, a functional time controller (C++11). ZLIB/LibPNG licensed.
+// - rlyeh ~~ listening to The Mission / Butterfly on a wheel
 
- * Simple fps framerate locker. based on code by /u/concavator (ref: http://goo.gl/Ry50A4)
-
- * issues:
- * - if year < 1900, sand::rtc() behavior is undefined
-
- * to do:
- * - grain -> struct grain { std::uint64_t seconds, fract; };
- * - looper/rtc -> serialize factor as well (and held?)
- * - move factor/shift and pause/resume to dt
- * - kiloseconds, ks | ref: http://bavardage.github.com/Kiloseconds/
- * - something like http://momentjs.com/ for pretty printing
- * - also, https://code.google.com/p/datejs/
-
- * - rlyeh ~~ listening to The Mission / Butterfly on a wheel
- */
-
+// @todo, max 64-bit
+// 18446744073709551615
+// 1TTTTYYMMDDhhmmssxxx TTTT = timezone, xxx = milliseconds
+// 18446744073709551615
+// 00YYMMDDhhmmssxxxxxx xxx xxx = microseconds
 
 #pragma once
-
-#include <cstdint>
+#include <stdint.h>
 #include <ctime>
-
 #include <deque>
 #include <string>
 
-#define SAND_VERSION "0.1.0" /* (2015/09/19) Moved framerate locker to a library apart
-#define SAND_VERSION "0.0.0" // (2010/xx/xx) Initial version */
+#define SAND_VERSION "v2.0.0" /* (2015/09/26) Upgraded version - more portable, less error prone
+#define SAND_VERSION "v1.0.0" // (2013/04/12) Initial version */
 
 namespace sand
 {
-    // sleep for shortest lapse
-    void wink();
-    // sleep for given seconds at least
-    void sleep( double seconds );
+    using point = uint64_t; // absolute time in milliseconds since Unix Epoch (1970/01/01 00:00:00.000 +00:00)
+    using lapse =  int64_t; // relative time in milliseconds between two timepoints; can be negative.
+    using uint = unsigned int;
 
-    // seconds since unix epoch (hires)
-    double now();
-    // seconds since start of program (hires)
-    double uptime();
-    // advance all clocks specified time (for QA and testing purposes)
-    void lapse( double t );
-    // void pause( bool on = false ) {}
-    // void resume() { pause(false); }
+    // sleep thread for specified milliseconds (at least)
+    void sleep( int64_t stamp );
 
-    // conversion
-    double nanoseconds( double t );
-    double microseconds( double t );
-    double milliseconds( double t );
-    double seconds( double t );
-    double minutes( double t );
-    double hours( double t );
-    double days( double t );
-    double weeks( double t );
-    double months( double t );
-    double years( double t );
-    double to_nanoseconds( double t );
-    double to_microseconds( double t );
-    double to_milliseconds( double t );
-    double to_seconds( double t );
-    double to_minutes( double t );
-    double to_hours( double t );
-    double to_days( double t );
-    double to_weeks( double t );
-    double to_months( double t );
-    double to_years( double t );
+    // UTC absolute time, GMT timezone, local time and uptime since program epoch (in milliseconds)
+    int64_t utc();
+    int64_t gmt();
+    int64_t now();
+    int64_t uptime();
 
-    double calendar( const std::string &YMDhms );
-    // double date( const std::string &YMD );
-    // double time( const std::string &hms );
+    // advance/rewind all clocks specified milliseconds (useful for QA and testing purposes)
+    void shift( int64_t lapse );
+
+    // conversion to milliseconds
+    int64_t nanoseconds( int64_t lapse );
+    int64_t microseconds( int64_t lapse );
+    int64_t milliseconds( int64_t lapse );
+    int64_t seconds( int64_t lapse );
+    int64_t minutes( int64_t lapse );
+    int64_t hours( int64_t lapse );
+    int64_t days( int64_t lapse );
+    int64_t weeks( int64_t lapse );
+
+    // conversion from milliseconds
+    int64_t as_nanoseconds( int64_t lapse );
+    int64_t as_microseconds( int64_t lapse );
+    int64_t as_milliseconds( int64_t lapse );
+    int64_t as_seconds( int64_t lapse );
+    int64_t as_minutes( int64_t lapse );
+    int64_t as_hours( int64_t lapse );
+    int64_t as_days( int64_t lapse );
+    int64_t as_weeks( int64_t lapse );
+
+    // calendar
+    int64_t date( int year, int month, int day );
+    int64_t time( int hour, int minute, int second, int millis = 0 );
+    int64_t datetime( int year, int month, int day, int hour, int minute, int second, int millis = 0 );
 
     // extraction
-    int hour( double timestamp );
-    int minute( double timestamp );
-    int second( double timestamp );
-    int day( double timestamp );
-    int month( double timestamp );
-    int year( double timestamp );
+    int year( int64_t stamp );
+    int month( int64_t stamp );
+    int day( int64_t stamp );
+    int hour( int64_t stamp );
+    int minute( int64_t stamp );
+    int second( int64_t stamp );
+    int millisecond( int64_t stamp );
 
-    // pretty printing
-    std::string diff( double since );
-    std::string diff( double since, double then );
-    std::string pretty( double t );
-    std::string ago( double t );
-    std::string in( double t );
-
-    // format
-    // locale = "es-ES", "Chinese_China.936", "en_US.UTF8", etc...
-    std::string format( double timestamp, const std::string &format, const std::string &locale = std::string() );
-    std::string locale( double timestamp, const std::string &locale, const std::string &format = std::string() );
+    // print
+    std::string format( int64_t stamp, const std::string &format = "yyyy-mm-dd HH:MM:SS.MS" );
+    std::string pretty( int64_t lapse );
 
     // serialization
-    std::string str( double timestamp );
-    double str( const std::string &timestamp );
+    std::string str( int64_t stamp );
+    int64_t str( const std::string &ymdhmsmtz );
 
     // usage:
-    // sand::dt dt;
+    // sand::timer dt;
     // [do something]
-    // double seconds_taken = dt.s();
-    class dt
+    // int64_t nanoseconds_taken = dt.ns(); (relative time)
+    class timer
     {
-        double start;
+        int64_t start;
 
         public:
 
-        dt() : start( sand::now() )
+        timer() : start( sand::now() )
         {}
 
         void reset() {
             start = sand::now();
         }
 
-        double s() {
-            return to_seconds( sand::now() - start );
+        int64_t s() {
+            return as_seconds( sand::now() - start );
         }
-        double ms() {
-            return to_milliseconds( sand::now() - start );
+        int64_t ms() {
+            return as_milliseconds( sand::now() - start );
         }
-        double us() {
-            return to_microseconds( sand::now() - start );
+        int64_t us() {
+            return as_microseconds( sand::now() - start );
         }
-        double ns() {
-            return to_nanoseconds( sand::now() - start );
+        int64_t ns() {
+            return as_nanoseconds( sand::now() - start );
         }
     };
 
-    // once(); !!
     // usage:
-    // sand::chrono ch(3.5);
-    // ch.s() -> [0..1]
+    // sand::chrono ch(3.5); // in seconds
+    // ch.t() -> [0..1] (normalized floating time)
     class chrono
     {
-        sand::dt dt;
+        sand::timer dt;
         double top;
 
         public:
 
         explicit
-        chrono( double _top = 1 ) : top(_top)
+        chrono( double _top = 1 ) : top(_top * 1000000000.0)
         {}
 
-        double s() {
+        double t() {
             if( top > 0 ) {
-                double now = dt.s() / top;
+                double now = dt.ns() / top;
                 return now >= 1.0 ? 1.0 : now;
             }
             return 1.0;
@@ -154,37 +133,42 @@ namespace sand
             dt.reset();
         }
 
-        void reset( double _top ) {
+        void reset( int64_t _top ) {
             top = _top;
             dt.reset();
         }
     };
 
-    // every(); !!
     // usage:
-    // sand::looper l(3.5); // loop every 3.5seconds
-    // l.s() -> [0..1][...]
+    // sand::looper l(3.5); // in seconds (similar to sand::chrono but will loop over and over)
+    // l.t() -> [0..1][...] (normalized floating time)
     class looper
     {
-        sand::dt dt;
-        float factor;
+        sand::timer dt;
+        double factor;
 
         public:
 
         explicit
-        looper( const float seconds = 1.f ) : factor(1.f/seconds)
+        looper( const double seconds = 1.0 ) : factor(1.0/seconds)
         {}
 
-        void reset( float seconds = 1.f ) {
-            factor = 1.f/seconds;
-            dt.reset();
-        }
-
-        double s() {
-            double now = dt.s() * factor;
+        double t() {
+            double now = (dt.ns() / 1000000000.0) * factor;
             if( now < 1.0 ) return now;
-            dt = sand::dt();
+            dt = sand::timer();
             return 1.0;
         }
+
+        void reset( double seconds = 1.0 ) {
+            factor = 1.0/seconds;
+            dt.reset();
+        }
     };
+
+    // @todo
+    // every(s); // if( every(5.0) ) {}
+    // once();   // if( once() ) {}
 }
+
+
